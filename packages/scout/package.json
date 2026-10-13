@@ -1,6 +1,6 @@
 {
   "name": "@outcrawl/scout",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "Apache-2.0",
   "type": "module",
   "description": "Scout, the open-source browser agent behind Outcrawl's hosted agent. Give it a task in plain words and it reads, clicks, types and extracts on any Chromium: a local browser, any CDP endpoint, or Outcrawl's cloud. Bring your own models, one per role, over any chat-completions endpoint.",

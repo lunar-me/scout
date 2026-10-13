@@ -18,7 +18,7 @@ It is the agent behind Outcrawl's hosted agent, published as it runs there: the 
 </a>
 </p>
 
-The end of a recorded run on Outcrawl's cloud, 13 October 2026. [Watch the whole run on GitHub](https://github.com/outcrawlai/scout#readme).
+The end of a recorded run on Outcrawl's cloud, 13 October 2026. [Watch the whole run on GitHub](https://github.com/outcrawlai/scout#readme). Full documentation: [outcrawl.ai/docs/scout](https://outcrawl.ai/docs/scout/overview).
 
 ## Start in three steps
 

@@ -16,6 +16,8 @@
   <a href="#bring-your-own-models">Models</a>
   &nbsp;·&nbsp;
   <a href="#the-best-way-to-run-it-outcrawls-cloud">Cloud</a>
+  &nbsp;·&nbsp;
+  <a href="https://outcrawl.ai/docs/scout/overview">Docs</a>
 </p>
 
 <p align="center">
