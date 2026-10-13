@@ -14,7 +14,7 @@ const result = await scout.run(
   'Go to https://news.ycombinator.com and report the three stories with the most comments on the front page: ' +
     'title, link and comment count for each.',
   {
-    caps: { steps: 15, duration: '5m' },
+    caps: { steps: 15, duration: '8m' },
     schema: {
       type: 'object',
       properties: {

@@ -13,6 +13,7 @@ import type { JsonSchema } from '@outcrawl/scout-core';
 import type { Action } from '../src/actions';
 import type { ExtractOutcome, ModelChoice } from '../src/loop';
 import { finalAnswerSchema, runAgent } from '../src/loop';
+import { nullableReadSchema } from '../src/result';
 import { capState, catalogueTree, harness, node, refOf, testPricing, tree, VirtualClock } from './support';
 import type { RunIntent } from '../src/resume';
 import { intentFrom } from '../src/resume';
@@ -1547,7 +1548,8 @@ describe('a schema-less final extraction whose page does not state the whole ans
     });
     const result = await runAgent(h.deps, { task: 'the tree', schema: recursive, caps: BUDGET_ONLY, stepFailures: null });
 
-    expect(asked[0]).toBe(recursive);
+    // Unwrapped: the run's read schema itself, not a `{answer, complete, missing}` wrapper.
+    expect(asked[0]).toEqual(nullableReadSchema(recursive));
     expect(result.data).toEqual({ name: 'root', children: [] });
   });
 });

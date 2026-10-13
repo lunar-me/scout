@@ -7,6 +7,7 @@ import { answerMarksGap,
   evaluateSchema,
   evaluateSubstance,
   mergeData,
+  nullableReadSchema,
   mergeUsage,
   resolveStatus,
   toWireResult,
@@ -92,6 +93,74 @@ describe('collected data accumulates rather than replacing', () => {
   test('a non-record replaces, because there is nothing to merge into', () => {
     expect(mergeData({ a: 1 }, [1, 2])).toEqual([1, 2]);
   });
+
+  test("a nested record keeps the fields a later page did not show, and takes the ones it did", () => {
+    // Read on the first book's page, then on the second's: the second page
+    // shows neither of the first book's fields.
+    const first = { attic: { price: '£51.77', inStock: 22 }, velvet: { price: null, inStock: null } };
+    const second = { attic: { price: '', inStock: null }, velvet: { price: '£53.74', inStock: 20 } };
+    expect(mergeData(first, second)).toEqual({
+      attic: { price: '£51.77', inStock: 22 },
+      velvet: { price: '£53.74', inStock: 20 },
+    });
+  });
+
+  test('a nested real value replaces, 0 included, and a held record survives a null in its place', () => {
+    expect(mergeData({ book: { inStock: 22, title: 'A' } }, { book: { inStock: 0 } })).toEqual({
+      book: { inStock: 0, title: 'A' },
+    });
+    expect(mergeData({ book: { inStock: 22 } }, { book: null })).toEqual({ book: { inStock: 22 } });
+  });
+
+  test('an array inside a record replaces whole', () => {
+    expect(mergeData({ shop: { items: [1, 2, 3], name: 'x' } }, { shop: { items: [4] } })).toEqual({
+      shop: { items: [4], name: 'x' },
+    });
+  });
+});
+
+describe('a read may say a field is not on its page', () => {
+  const caller = {
+    type: 'object',
+    properties: {
+      book: {
+        type: 'object',
+        properties: { price: { type: 'string' }, inStock: { type: 'integer' }, format: { type: 'string', enum: ['paper', 'cloth'] } },
+        required: ['price', 'inStock', 'format'],
+      },
+      tags: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] } },
+      cheaper: { type: 'string' },
+    },
+    required: ['book', 'tags', 'cheaper'],
+  };
+
+  test('every record field, nested ones included, accepts null and still has to be answered', () => {
+    const read = nullableReadSchema(caller);
+    expect(read).toEqual({
+      type: 'object',
+      properties: {
+        book: {
+          type: ['object', 'null'],
+          properties: {
+            price: { type: ['string', 'null'] },
+            inStock: { type: ['integer', 'null'] },
+            format: { type: ['string', 'null'], enum: ['paper', 'cloth', null] },
+          },
+          required: ['price', 'inStock', 'format'],
+        },
+        // The array may be null; its items are the caller's, because an array
+        // replaces whole and nothing held could stand behind a null inside it.
+        tags: { type: ['array', 'null'], items: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] } },
+        cheaper: { type: ['string', 'null'] },
+      },
+      required: ['book', 'tags', 'cheaper'],
+    });
+  });
+
+  test('a field with no type to widen takes null as a branch of its own', () => {
+    const read = nullableReadSchema({ type: 'object', properties: { ref: { $ref: '#/$defs/Book' } } });
+    expect(read['properties']).toEqual({ ref: { anyOf: [{ $ref: '#/$defs/Book' }, { type: 'null' }] } });
+  });
 });
 
 describe('the schema is the verifier', () => {
@@ -121,6 +190,23 @@ describe('the schema is the verifier', () => {
   test('nothing extracted at all is not satisfaction', () => {
     expect(evaluateSchema(schema, undefined).satisfied).toBe(false);
     expect(evaluateSchema(schema, {}).missing).toEqual(['airline', 'price']);
+  });
+
+  test('a required field of a nested record that is null or absent is missing, by its path', () => {
+    const books = {
+      type: 'object',
+      required: ['attic', 'cheaper'],
+      properties: {
+        attic: { type: 'object', required: ['price', 'inStock'], properties: { price: { type: 'string' }, inStock: { type: 'integer' } } },
+        cheaper: { type: 'string' },
+      },
+    };
+    expect(evaluateSchema(books, { attic: { price: '£51.77', inStock: null }, cheaper: 'A' })).toEqual({
+      satisfied: false,
+      missing: ['attic.inStock'],
+    });
+    expect(evaluateSchema(books, { attic: { inStock: 0 }, cheaper: 'A' }).missing).toEqual(['attic.price']);
+    expect(evaluateSchema(books, { attic: { price: '£51.77', inStock: 0 }, cheaper: 'A' }).satisfied).toBe(true);
   });
 
   test('a schema with no required list is satisfied by any data at all', () => {

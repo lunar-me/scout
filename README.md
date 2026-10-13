@@ -91,7 +91,7 @@ Tasks you would do in a browser yourself, written the way you would ask a collea
 - **Research.** "Go to Hacker News and report the three stories with the most comments: title, link and comment count." [`research.ts`](packages/scout/examples/research.ts)
 - **Fill in a form.** "Order a pizza on this form, then tell me exactly what the shop received." [`form-fill.ts`](packages/scout/examples/form-fill.ts)
 - **Compare.** "Find these two books and compare their price and stock, then tell me which is cheaper." [`compare.ts`](packages/scout/examples/compare.ts)
-- **Sign in.** "Sign in with these details, read the welcome message, then sign out." [`login.ts`](packages/scout/examples/login.ts)
+- **Sign in.** "Sign in with these details and read the welcome message." [`login.ts`](packages/scout/examples/login.ts)
 - **On the cloud.** The research task on Outcrawl's cloud, with a link to watch the replay. [`outcrawl.ts`](packages/scout/examples/outcrawl.ts)
 
 Want the answer in a fixed shape, such as a list of names and prices? Pass a JSON Schema with the task and the answer comes back in exactly that shape.

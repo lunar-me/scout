@@ -1,6 +1,6 @@
 /**
- * A login flow: sign in, read a page that is only there once you are signed
- * in, and sign out again.
+ * A login flow: sign in, then read the page that is only there once you are
+ * signed in.
  *
  * The site is a public test site whose demo credentials are printed on its own
  * login page. For a real site, read the credentials from your environment
@@ -18,22 +18,20 @@ const password = process.env['DEMO_PASSWORD'] ?? 'Password123';
 
 const scout = new Scout({ browser: { launch: {} }, models: modelsFromEnv() });
 
-// Each step is named in the task, the read included: a small hands model told only to
-// "report" what the signed-in page shows often logs out before it has read that page.
+// The read is named in the task: a small hands model told only to "report" what the
+// signed-in page shows sometimes moves on before it has read that page.
 const result = await scout.run(
   `Go to https://practicetestautomation.com/practice-test-login/ and sign in with username "${username}" and ` +
-    `password "${password}". Then extract the heading and the message of the page you reach. ` +
-    'Then log out and extract the heading of the page you land on.',
+    `password "${password}". Then extract the heading and the message of the page you reach.`,
   {
-    caps: { steps: 15, duration: '4m' },
+    caps: { steps: 25, duration: '10m' },
     schema: {
       type: 'object',
       properties: {
-        signedInHeading: { type: 'string' },
-        signedInMessage: { type: 'string' },
-        signedOutHeading: { type: 'string' },
+        heading: { type: 'string' },
+        message: { type: 'string' },
       },
-      required: ['signedInHeading', 'signedInMessage', 'signedOutHeading'],
+      required: ['heading', 'message'],
     },
   },
 );

@@ -18,7 +18,7 @@ const result = await scout.run(
   'On https://books.toscrape.com find the books "A Light in the Attic" and "Tipping the Velvet". ' +
     "Open each book's own page and report its price and how many copies are in stock, then say which is cheaper.",
   {
-    caps: { steps: 30, duration: '8m' },
+    caps: { steps: 30, duration: '15m' },
     // One named field per book rather than a list: Scout merges what each page
     // gives it field by field, so the first book's details survive while it
     // reads the second book's page. A list is replaced whole by each new read.

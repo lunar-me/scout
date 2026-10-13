@@ -56,7 +56,7 @@ const scout = new Scout({
 const result = await scout.run(
   'Go to https://books.toscrape.com, open the first book in the Poetry category and report its title and price.',
   {
-    caps: { steps: 15, duration: '3m' },
+    caps: { steps: 15, duration: '8m' },
     schema: {
       type: 'object',
       properties: { title: { type: 'string' }, price: { type: 'string' } },
@@ -189,7 +189,7 @@ Each reads its models from the environment (see [`examples/models.ts`](https://g
 - [`research.ts`](https://github.com/outcrawlai/scout/blob/main/packages/scout/examples/research.ts): the three most-commented stories on the Hacker News front page, as structured results.
 - [`form-fill.ts`](https://github.com/outcrawlai/scout/blob/main/packages/scout/examples/form-fill.ts): fill in and submit an order form, then read back what the server received.
 - [`compare.ts`](https://github.com/outcrawlai/scout/blob/main/packages/scout/examples/compare.ts): open two books and compare price and stock in one answer.
-- [`login.ts`](https://github.com/outcrawlai/scout/blob/main/packages/scout/examples/login.ts): sign in, read the signed-in page, sign out.
+- [`login.ts`](https://github.com/outcrawlai/scout/blob/main/packages/scout/examples/login.ts): sign in and read the signed-in page.
 - [`outcrawl.ts`](https://github.com/outcrawlai/scout/blob/main/packages/scout/examples/outcrawl.ts): the research task on Outcrawl's cloud, with a replay link.
 
 ## Licence

@@ -17,7 +17,7 @@ const result = await scout.run(
     'delivery instructions "Ring twice". Submit the order, then report the customer name, size and toppings ' +
     'exactly as the page that loads after submitting shows them.',
   {
-    caps: { steps: 25, duration: '5m' },
+    caps: { steps: 25, duration: '10m' },
     schema: {
       type: 'object',
       properties: {

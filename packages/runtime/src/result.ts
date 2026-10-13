@@ -18,6 +18,7 @@ import {
   type AgentStopReason,
   type CapName,
   type ExtractCut,
+  isRecord,
   type JsonSchema,
   type ObservedAction,
   type SettledAgentResult,
@@ -1026,19 +1027,28 @@ export function totalCredits(steps: readonly StepTrace[]): string {
 
 /**
  * Folds a new extraction into what the run has already collected. Records
- * merge field by field, so a run that gets two fields on step 3 and two more
- * on step 7 returns four; anything else replaces.
+ * merge field by field, at every depth, so a run that gets two fields on step 3
+ * and two more on step 7 returns four, and a read that fills one product's
+ * record leaves another product's record as it was. Anything else (an array, a
+ * string, a number) replaces.
  *
  * A field the new extraction left EMPTY (`null`, or a string with nothing but
  * whitespace in it) does not replace one the run already holds a value for.
- * An extraction reads only the page in front of it, and a schema that requires
- * a string field gives the extractor no way to omit one that page does not
- * show: measured 2026-10-13, the real extract request on a signed-out page with
- * an instruction asking only for the signed-out message (n=5) returned `""` for
- * both signed-in fields 4 times. Merged by plain spread, that read erases a
- * signed-in heading and message the run read on an earlier page. A page
- * stating a field is empty and a page not showing it read the same here; the
- * merge keeps the value the run read.
+ * An extraction reads only the page in front of it, and reports a field its
+ * page does not show as `null` (see {@link nullableReadSchema}) or, from a model
+ * that ignores that, as `""`: measured 2026-10-13, the real extract request on
+ * a signed-out page with an instruction asking only for the signed-out message
+ * (n=5) returned `""` for both signed-in fields 4 times. Merged by plain
+ * spread, that read erases a signed-in heading and message the run read on an
+ * earlier page. A page stating a field is empty and a page not showing it read
+ * the same here; the merge keeps the value the run read.
+ *
+ * Nested records merge the same way. Merged whole, a read of the second
+ * product's page carried the first product's record as well, with a stock
+ * count that page does not show, and replaced the count the run had read on
+ * the first product's own page (Scout compare example, 2026-10-13: a held 22
+ * became 0). Arrays still replace: nothing says which earlier item a later
+ * item is.
  */
 export function mergeData(collected: unknown, next: unknown): unknown {
   if (next === undefined) {
@@ -1048,6 +1058,10 @@ export function mergeData(collected: unknown, next: unknown): unknown {
     const merged: Record<string, unknown> = { ...collected };
     for (const [key, value] of Object.entries(next)) {
       const held = collected[key];
+      if (isRecord(held) && isRecord(value)) {
+        merged[key] = mergeData(held, value);
+        continue;
+      }
       const blank = value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
       const holds = held !== undefined && held !== null && !(typeof held === 'string' && held.trim() === '');
       if (!(blank && holds)) merged[key] = value;
@@ -1057,8 +1071,65 @@ export function mergeData(collected: unknown, next: unknown): unknown {
   return next;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+/**
+ * The schema an agent's read is held to: the caller's, with every field of
+ * every record allowed to be `null`, so a read can say "this page does not
+ * show it". The extract prompt already asks for `null` "when the schema allows
+ * null"; a caller's schema that requires an integer gives a read no such word,
+ * and the read writes one. Measured 2026-10-13 (Scout compare example, a small
+ * hands model, local stock Chromium): reads of the second book's page returned
+ * the first book's stock count as 0 or -1, which that page does not show.
+ *
+ * Replayed the same day on 89 recorded reads (login, compare, form read-back,
+ * a news list), 3 times each per schema, on two extractor models. Fields the
+ * read's page does not show came back as a wrong value in 69 of 330 and 28 of
+ * 281 with the caller's schema, and in 19 of 330 and 11 of 330 with this one,
+ * where every one left is a field the read's own instruction named for that
+ * page. Fields the page shows and the read asked for came back null 0 times
+ * (n=426 and n=424). On the second model, 38 of 267 reads with the caller's
+ * schema failed outright because it answered `null` for a required field
+ * anyway (21 of 54 reads of a signed-in page); 1 of 267 failed with this one,
+ * on an array item.
+ *
+ * Fields of records only, because a `null` helps only where {@link mergeData}
+ * keeps what the run already holds in its place. Array items stay as the
+ * caller wrote them (an array replaces whole, so a `null` inside one reaches
+ * the result with nothing behind it), and so does a `$ref`'s target, which an
+ * array may share. `required` is untouched: every field is still answered,
+ * `null` included.
+ *
+ * The run's answer is still held to the caller's schema: a `null` with nothing
+ * held behind it is a missing field to {@link evaluateSchema}.
+ */
+export function nullableReadSchema(schema: JsonSchema): JsonSchema {
+  const properties = schema['properties'];
+  if (!isRecord(properties)) {
+    return schema;
+  }
+  const nullable: Record<string, unknown> = {};
+  for (const [name, child] of Object.entries(properties)) {
+    nullable[name] = isRecord(child) ? allowNull(nullableReadSchema(child as JsonSchema)) : child;
+  }
+  return { ...schema, properties: nullable } as JsonSchema;
+}
+
+function allowNull(schema: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  const type = schema['type'];
+  const types: readonly unknown[] = typeof type === 'string' ? [type] : Array.isArray(type) ? type : [];
+  if (types.includes('null')) {
+    return { ...schema };
+  }
+  if (types.length === 0 || 'const' in schema) {
+    // Nothing to widen (`$ref`, `anyOf`, `const`, or an unconstrained field):
+    // `null` is offered as a branch of its own.
+    return { anyOf: [schema, { type: 'null' }] };
+  }
+  const enumerated = schema['enum'];
+  return {
+    ...schema,
+    type: [...types, 'null'],
+    ...(Array.isArray(enumerated) && !enumerated.includes(null) ? { enum: [...enumerated, null] } : {}),
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -1100,13 +1171,16 @@ function typeMatches(declared: unknown, value: unknown): boolean {
  * *is* the outcome — deterministic and free, rather than a second inference
  * pass asking a model whether it thinks it finished.
  *
- * Top-level `required` and top-level declared types only. A deeper check would
- * start rejecting data a customer would happily have taken.
+ * Top-level `required` and top-level declared types. Below the top level, only
+ * PRESENCE: a required field of a nested record that is absent or `null` is
+ * missing, named by its path (`book.inStock`). A read may now answer `null`
+ * for a field its page does not show ({@link nullableReadSchema}), and a
+ * `null` nothing later filled is a field the run does not have. Nested types
+ * are not checked: a deeper type check would start rejecting data a customer
+ * would happily have taken.
  */
 export function evaluateSchema(schema: JsonSchema, data: unknown): SchemaVerdict {
-  const required = Array.isArray(schema['required'])
-    ? (schema['required'] as unknown[]).filter((key): key is string => typeof key === 'string')
-    : [];
+  const required = requiredKeys(schema);
   const properties = isRecord(schema['properties']) ? schema['properties'] : {};
 
   if (!isRecord(data)) {
@@ -1123,6 +1197,10 @@ export function evaluateSchema(schema: JsonSchema, data: unknown): SchemaVerdict
     const declared = properties[key];
     if (isRecord(declared) && !typeMatches(declared['type'], value)) {
       missing.push(key);
+      continue;
+    }
+    if (isRecord(declared) && isRecord(value)) {
+      absentBelow(declared, value, `${key}.`, missing);
     }
   }
 
@@ -1130,6 +1208,30 @@ export function evaluateSchema(schema: JsonSchema, data: unknown): SchemaVerdict
     return { satisfied: Object.keys(data).length > 0, missing: [] };
   }
   return { satisfied: missing.length === 0, missing };
+}
+
+function requiredKeys(schema: Readonly<Record<string, unknown>>): string[] {
+  const required = schema['required'];
+  return Array.isArray(required) ? required.filter((key): key is string => typeof key === 'string') : [];
+}
+
+/** {@link evaluateSchema} below the top level: required fields that are absent or `null`, by path. */
+function absentBelow(
+  schema: Readonly<Record<string, unknown>>,
+  data: Readonly<Record<string, unknown>>,
+  path: string,
+  missing: string[],
+): void {
+  const properties = isRecord(schema['properties']) ? schema['properties'] : {};
+  for (const key of requiredKeys(schema)) {
+    const value = data[key];
+    const declared = properties[key];
+    if (value === undefined || value === null) {
+      missing.push(`${path}${key}`);
+    } else if (isRecord(declared) && isRecord(value)) {
+      absentBelow(declared, value, `${path}${key}.`, missing);
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -1253,9 +1355,7 @@ function vacuousValue(value: unknown): boolean {
  * holding runs over data a customer would happily have taken.
  */
 export function evaluateSubstance(schema: JsonSchema, data: unknown): SubstanceVerdict {
-  const required = Array.isArray(schema['required'])
-    ? (schema['required'] as unknown[]).filter((key): key is string => typeof key === 'string')
-    : [];
+  const required = requiredKeys(schema);
   if (!isRecord(data)) {
     return { substantive: false, vacuous: required.length > 0 ? required : ['<root>'] };
   }

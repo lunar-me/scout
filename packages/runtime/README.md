@@ -88,8 +88,10 @@ satisfying it is a complete test bed. Without this package `POST /v1/agent` and
   `serializeTree`, `findNode`, `hashSnapshot`. `caps.ts` — `validateCaps`, `CapLedger`,
   `parseDuration`, `capStopReason`, `GoalLedger`, `GoalCapPolicy`.
 - `result.ts` — `AgentResult` (carrying `goals`, `findings` and `ruledOut` — the complete record,
-  including what the prompt's ceiling compacted away), `StepTrace`, `evaluateSchema`, `mergeData`,
-  `mergeUsage`, `resolveStatus`, `aggregateCache`, `toWireResult`/`toWireStep`, `GoalState`,
+  including what the prompt's ceiling compacted away), `StepTrace`, `evaluateSchema`, `mergeData`
+  (records merge field by field at every depth; a later `null` or blank keeps the held value),
+  `nullableReadSchema` (the run's schema with every record field allowed `null`, which every agent
+  read is held to), `mergeUsage`, `resolveStatus`, `aggregateCache`, `toWireResult`/`toWireStep`, `GoalState`,
   `GoalStatus`, `AgentMemory`, `Finding`, `RuledOut`, `boundMemory`, `MEMORY_CHAR_BUDGET`,
   `FINDINGS_CHAR_BUDGET`.
   `loop.ts` — `AgentDeps` (`snapshot`, `lock`, `unlock`, `perform`, `extract`, `model`, plus

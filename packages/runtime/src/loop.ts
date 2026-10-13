@@ -130,6 +130,7 @@ import {
   evaluateSubstance,
   mergeData,
   mergeUsage,
+  nullableReadSchema,
   resolveStatus,
   subscriptionCallsField,
 } from './result';
@@ -8078,6 +8079,13 @@ export async function runAgent<T = unknown>(
    * the schema caps a list, read once. See {@link listCapFraming}.
    */
   const framing = req.schema === undefined ? undefined : listCapFraming(req.task, req.schema);
+  /**
+   * What every agent read is held to: the run's schema with each record field
+   * allowed to be `null`, so a page that does not show a field can say so and
+   * `mergeData` keeps what the run already holds. See {@link nullableReadSchema}.
+   * The run's answer is still judged against `req.schema`.
+   */
+  const readSchema = req.schema === undefined ? undefined : nullableReadSchema(req.schema);
   const extractSelection = (instruction: string | undefined): ExtractSelection => ({
     task: req.task,
     instruction: instruction ?? null,
@@ -11560,7 +11568,7 @@ export async function runAgent<T = unknown>(
             // `finalAnswerSchema`), including the last allowed attempt.
             const finalSchema =
               action.type === 'extract' && answersTask(action)
-                ? finalAnswerSchema(req.schema)
+                ? finalAnswerSchema(readSchema)
                 : undefined;
             const finalAsked = finalSchema !== undefined;
             const extractionKey = action.type === 'extract' && cutReadKeys.size > 0
@@ -11606,7 +11614,7 @@ export async function runAgent<T = unknown>(
                         extractBound(),
                         extractSelection(action.instruction),
                       )
-                    : await page.extract(req.schema, action.instruction, framing, extractBound(), extractSelection(action.instruction));
+                    : await page.extract(readSchema, action.instruction, framing, extractBound(), extractSelection(action.instruction));
                 break;
               case 'openTab': {
                 const opened = await page.openTab(action.url);
@@ -12202,7 +12210,7 @@ export async function runAgent<T = unknown>(
               });
               const { results, halt } = await dispatchFan(control, plan, {
                 filter: req.filter,
-                schema: req.schema,
+                schema: readSchema,
                 framing,
                 finalFraming:
                   finalAnswerSchema(req.schema) !== undefined
