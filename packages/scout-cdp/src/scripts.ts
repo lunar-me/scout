@@ -245,6 +245,87 @@ export const NATIVE_DATE_LAYOUT = `function () {
 }`;
 
 /**
+ * The form a click on `this` (`by` 'click') or an Enter in it ('enter') sends,
+ * and every control in it that fails the browser's constraint validation, by
+ * label and `validationMessage`, at most three, in form order; `null` when
+ * `this` sends no form, the form or its submitter skips validation, or every
+ * control is valid. `focused`: the first invalid control holds focus, where
+ * the browser puts it when it refuses a submit.
+ *
+ * Runs in the look world and reads PROPERTIES only: `willValidate`,
+ * `validity`, `validationMessage`, `labels`. Never `checkValidity()` or
+ * `reportValidity()`, which fire `invalid` events at the page. A segment of a
+ * date or time input answers for its input. Mirrors Blink's implicit
+ * submission for 'enter': the form's default button sends it, and with none
+ * a form sends only when it has at most one field that blocks it.
+ */
+export function refusedSubmit(by: 'click' | 'enter'): string {
+  return `function () {
+  var by = ${JSON.stringify(by)};
+  var el = this.nodeType === 1 ? this : this.parentElement;
+  if (!el) return null;
+  var root = el.getRootNode();
+  if (root && root.nodeType === 11 && root.host && root.host.tagName === 'INPUT') el = root.host;
+  if (!el.isConnected) return null;
+  var isSubmitter = function (node) {
+    return (node.tagName === 'BUTTON' && node.type === 'submit') ||
+      (node.tagName === 'INPUT' && (node.type === 'submit' || node.type === 'image'));
+  };
+  var form = null;
+  var submitter = el.closest('button, input');
+  if (submitter !== null && isSubmitter(submitter)) {
+    if (submitter.disabled || submitter.formNoValidate) return null;
+    form = submitter.form;
+  } else if (by === 'enter' && el.tagName === 'INPUT' && !(submitter !== null && submitter.tagName === 'BUTTON')) {
+    form = el.form;
+    if (form === null) return null;
+    var blocking = { text: 1, search: 1, url: 1, tel: 1, email: 1, password: 1, date: 1, month: 1, week: 1, time: 1, 'datetime-local': 1, number: 1 };
+    var fallback = null;
+    var fields = 0;
+    for (var e = 0; e < form.elements.length; e += 1) {
+      var item = form.elements[e];
+      if (fallback === null && isSubmitter(item)) fallback = item;
+      if (item.tagName === 'INPUT' && blocking[item.type] === 1) fields += 1;
+    }
+    if (fallback !== null ? fallback.disabled || fallback.formNoValidate : fields > 1) return null;
+  }
+  if (form === null || form.noValidate) return null;
+  var words = function (node, out) {
+    if (node.nodeType === 3) { out.push(node.nodeValue); return; }
+    if (node.nodeType !== 1 || /^(SELECT|TEXTAREA|BUTTON|SCRIPT|STYLE|DATALIST)$/.test(node.tagName)) return;
+    for (var c = node.firstChild; c !== null; c = c.nextSibling) words(c, out);
+  };
+  var tidy = function (text) { return (text || '').replace(/\\s+/g, ' ').trim().slice(0, 80); };
+  var labelOf = function (control) {
+    var named = tidy(control.getAttribute('aria-label'));
+    var ids = control.getAttribute('aria-labelledby');
+    if (named === '' && ids) {
+      named = tidy(ids.split(/\\s+/).map(function (id) {
+        var target = control.getRootNode().getElementById(id);
+        return target === null ? '' : target.textContent;
+      }).join(' '));
+    }
+    if (named === '' && control.labels && control.labels.length > 0) {
+      var out = [];
+      words(control.labels[0], out);
+      named = tidy(out.join(' '));
+    }
+    return named || tidy(control.getAttribute('title')) || tidy(control.getAttribute('placeholder')) || tidy(control.getAttribute('name'));
+  };
+  var invalid = [];
+  var first = null;
+  for (var i = 0; i < form.elements.length && invalid.length < 3; i += 1) {
+    var control = form.elements[i];
+    if (!control.willValidate || control.validity.valid) continue;
+    if (first === null) first = control;
+    invalid.push({ label: labelOf(control), message: control.validationMessage });
+  }
+  if (first === null) return null;
+  return { fields: invalid, focused: el.ownerDocument.activeElement === first };
+}`;
+}
+
+/**
  * `this` and each argument are tree nodes whose label carries a labelled
  * control's checked state: for each, in order, the `type` of the `<input>`
  * the nearest enclosing `<label>` controls, or `null`. The walk crosses
@@ -274,6 +355,9 @@ export const LABELLED_CONTROL_TYPES = `function () {
  * Past it the wire's own word stands.
  */
 export const MAX_MIXED_LABEL_READS = 64;
+
+/** The most native date/time inputs one snapshot reads to mark (`withNativeDateFields`). */
+export const MAX_NATIVE_DATE_READS = 16;
 
 /**
  * `this` is the click's target, `cover` what the hit test named instead: the

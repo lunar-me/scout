@@ -16,6 +16,8 @@ import { createHash } from 'node:crypto';
 
 import type { NodeRef as WireNodeRef } from '@outcrawl/scout-core';
 
+import { NATIVE_DATE_FORMAT, type NativeDateKind } from './native-date';
+
 /* ------------------------------------------------------------------ *
  * The node reference
  * ------------------------------------------------------------------ */
@@ -218,6 +220,13 @@ export interface AxState {
   readonly paintHidden?: boolean;
   /** Native text has a real click target or an associated enabled label control. */
   readonly pointable?: boolean;
+  /**
+   * The first segment of a native date/time input, by the input's kind. Set
+   * by the binding only where the element is one of Blink's own date-time
+   * segments, never from a name, because a fill of the whole value works only
+   * there (`nativeDatePlan` in the binding). Rendered as how to fill it.
+   */
+  readonly nativeDate?: NativeDateKind;
 }
 
 export interface AxNode {
@@ -720,6 +729,12 @@ function stateProps(state: AxState | undefined): string {
     }
     if (key === 'paintHidden') {
       flags.push('not visible: not painted, not a visible confirmation');
+      continue;
+    }
+    if (key === 'nativeDate' && typeof value === 'string' && value in NATIVE_DATE_FORMAT) {
+      const kind = value as NativeDateKind;
+      const what = kind === 'datetime-local' ? 'date and time' : kind;
+      flags.push(`first part of a ${what} field: fill it with the whole ${what}, as ${NATIVE_DATE_FORMAT[kind]}`);
       continue;
     }
     flags.push(value === true ? key : `${key}=${String(value)}`);

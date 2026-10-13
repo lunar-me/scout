@@ -156,7 +156,7 @@ import { DEFAULT_SETTLE_POLICY, challengeNotice, settleTree, unrenderedNotice } 
 import { fittingSiteNotes, siteHost, siteNotesBlock, type SiteNote, type SiteSkills } from './site-skills';
 import type { AxNode, AxTree, FilterOptions, NodeRef } from './snapshot';
 import { filterTree, findNode, formatNodeRef, hashSnapshot, sameNode, serializeTree, walk } from './snapshot';
-import type { CheckTrace, Expectation } from './verify';
+import type { CheckTrace, Expectation, RefusedSubmit } from './verify';
 import {
   checkAction,
   checkReportedUrl,
@@ -164,6 +164,7 @@ import {
   contradictionNote,
   expectationFor,
   expectationForProgram,
+  refusedSubmitCheck,
 } from './verify';
 import type { PageView } from './view';
 import { markLegend } from './view';
@@ -883,6 +884,15 @@ export interface AgentDeps {
    */
   holds?(ref: NodeRef, written: string): MaybePromise<boolean | undefined>;
   /**
+   * The form a click on `ref`, or an Enter on it (`by`), would have sent, when
+   * the browser's own constraint validation refuses it: see
+   * {@link RefusedSubmit}. `undefined` when `ref` sends no form, the form does
+   * not validate, or every control in it is valid. Read without anything the
+   * page can observe: properties only, never `checkValidity()`, which fires
+   * `invalid` events. Optional: absent, a refused submit reads as the page did.
+   */
+  refusedSubmit?(ref: NodeRef, by: 'click' | 'enter'): MaybePromise<RefusedSubmit | undefined>;
+  /**
    * The page as pixels, when the host can paint marks on it.
    *
    * Optional, and absent means "this host has no camera", which is how
@@ -1555,6 +1565,8 @@ export interface LockedPage {
    * say. See {@link AgentDeps.holds}.
    */
   holds(ref: NodeRef, written: string): Promise<boolean | undefined>;
+  /** {@link AgentDeps.refusedSubmit}, under the freeze; `undefined` from a host without it. */
+  refusedSubmit(ref: NodeRef, by: 'click' | 'enter'): Promise<RefusedSubmit | undefined>;
   /** The model call. Under the lock deliberately — it is the slow part of the step. */
   think(prompt: AgentPrompt): Promise<ModelChoice>;
   perform(action: Action, signal?: AbortSignal, allowanceMs?: number): Promise<PerformOutcome>;
@@ -1787,6 +1799,7 @@ export class PageSession {
       snapshot: () => this.snapshot(),
       snapshotAfterAction: () => this.snapshotAfterAction(),
       holds: (ref, written) => this.holds(ref, written),
+      refusedSubmit: (ref, by) => this.refusedSubmit(ref, by),
       think: (prompt) => this.think(prompt),
       perform: (action, signal, allowanceMs) => this.perform(action, signal, allowanceMs),
       extract: (schema, instruction, framing, bound, selection) => this.extract(schema, instruction, framing, bound, selection),
@@ -2262,6 +2275,12 @@ export class PageSession {
   async holds(ref: NodeRef, written: string): Promise<boolean | undefined> {
     this.#require('holds');
     return await this.#deps.holds?.(ref, written);
+  }
+
+  /** See {@link AgentDeps.refusedSubmit}. Under the freeze like every read. */
+  async refusedSubmit(ref: NodeRef, by: 'click' | 'enter'): Promise<RefusedSubmit | undefined> {
+    this.#require('refusedSubmit');
+    return await this.#deps.refusedSubmit?.(ref, by);
   }
 
   /**
@@ -3771,12 +3790,20 @@ function openGoalsNotice(open: readonly GoalState[], schema: boolean): string {
   return (
     `${schema ? 'Your answer already satisfies the schema' : 'Your answer is recorded'}, but ${String(open.length)} sub-goal(s) you stated are ` +
     `still open (${open.map((goal) => `${goal.id} ${goal.goal}`).join('; ')}), so the run is not over. ` +
-    'Close each one that is finished with {"goal":{"id":"...","status":"done","summary":"what happened"}}, ' +
-    'finish the rest, or close each one you cannot do with ' +
-    '{"goal":{"id":"...","status":"failed","summary":"why"}} — that is a real answer and it costs you ' +
-    'no step. Four of five is better than none, but four of five reported as five is worse than either.'
+    `${CLOSE_GOALS} — that is a real answer and it costs you no step. Four of five is better than none, but ` +
+    'four of five reported as five is worse than either.'
   );
 }
+
+/**
+ * How the loop tells a model to close the sub-goals it is holding a finish
+ * for: the `done` closure for each one that is finished, the `failed` one for
+ * each that cannot be. Shared by the schema hold and the `done` refusal, whose
+ * measurements are on {@link openGoalsNotice} and at the refusal.
+ */
+const CLOSE_GOALS =
+  'Close each one that is finished with {"goal":{"id":"...","status":"done","summary":"what happened"}}, ' +
+  'finish the rest, or close each one you cannot do with {"goal":{"id":"...","status":"failed","summary":"why"}}';
 
 /**
  * "YOU HAVE BEEN HERE BEFORE", and it is the fact this loop was missing.
@@ -4827,10 +4854,31 @@ export function finalAnswerSchema(schema: JsonSchema | undefined): JsonSchema | 
  * state the title — called it complete. Over the 7 days to 2026-09-28 19:11Z,
  * 25 of 257 run-ending final extracts said in their own reasoning that work
  * remained (LLM judge over every final extract's reasoning, n=1,335).
+ *
+ * `held` is the other thing the run knows: on a schema run, the fields it
+ * already recorded from pages it read earlier (see {@link heldFields}). The
+ * loop merges this read over them, so the run's answer is the two together,
+ * and a check shown only this page was asking whether ONE page states an
+ * answer the run assembled from several. Measured 2026-10-13, Scout login
+ * example (sign in, read two fields, log out, read a third; hands only, a
+ * small hands model; n=5 runs): 2 of 5 ran to their cap with all three fields
+ * held, because the read on the signed-out page was judged "not the whole
+ * answer: the signed-in heading and message are not present on this page", and
+ * the model was sent to sign in again to find them. Replayed on the three
+ * recorded final requests of those two runs, n=10 each: the small hands model
+ * called them complete 12 of 30 times before and 30 of 30 with `held`; the
+ * production default extractor 19 of 30 before and 30 of 30 with it. A final
+ * on the signed-in page, with those two fields held and the log-out still to
+ * do, stayed incomplete in every reply that parsed, with `held` (10 of 10 and
+ * 7 of 7) and without it.
  */
 export function finalAnswerFraming(
   task: string,
-  step: { readonly reasoning?: string | undefined; readonly elapsedMs?: number } = {},
+  step: {
+    readonly reasoning?: string | undefined;
+    readonly elapsedMs?: number;
+    readonly held?: Readonly<Record<string, unknown>> | undefined;
+  } = {},
 ): string {
   const lines = [
     `This extraction is proposed as the FINAL ANSWER to the task, and the run ends on it: ${task}`,
@@ -4842,16 +4890,53 @@ export function finalAnswerFraming(
   if (reasoning !== undefined && reasoning !== '') {
     lines.push(`The agent's own reasoning for proposing it: ${reasoning}`);
   }
+  const held = step.held === undefined ? undefined : JSON.stringify(step.held);
+  if (held !== undefined) {
+    lines.push(
+      'The run already holds these fields from pages it read earlier: ' +
+        `${held.length > HELD_FIELDS_CHARS ? `${held.slice(0, HELD_FIELDS_CHARS)}…` : held}. A field this read ` +
+        'leaves empty keeps the value held here, so it is not missing because this page does not state it; a ' +
+        'field this read fills replaces it.',
+    );
+  }
   lines.push(
-    'Put the answer in `answer`, from this page. Set `complete` to true only when this page states ' +
-      'everything the task asks for AND nothing else the task asks for is still to be done; set it to false ' +
-      'when the page leaves any of it out, does not hold the answer at all, or only describes where the ' +
+    'Put the answer in `answer`, from this page. Set `complete` to true only when this page' +
+      (held === undefined ? '' : ', together with the fields the run already holds,') +
+      ' states everything the task asks for AND nothing else the task asks for is still to be done; set it to ' +
+      'false when the page leaves any of it out, does not hold the answer at all, or only describes where the ' +
       'answer might be, when the task asks for something that has not happened yet (an action still to take, ' +
       'time still to pass), or when the agent\'s reasoning says it still has work to do. A duration the task ' +
       'asks for counts as done only once ALL of it has passed by the run time above: close to it is not done. ' +
       'Then name what is missing or still to do in `missing` (empty when complete).',
   );
   return lines.join('\n');
+}
+
+/** How much of {@link heldFields} a final extraction's framing quotes. */
+const HELD_FIELDS_CHARS = 2_000;
+
+/**
+ * The fields a schema run already holds an answer in, for
+ * {@link finalAnswerFraming}: the collected record's keys whose values are not
+ * vacuous (see `evaluateSubstance`), or `undefined` when there are none.
+ *
+ * Only on a schema of more than one property, the one shape whose answer is
+ * assembled across reads (`mergeData` keeps a held field a later read leaves
+ * empty). A schema-less run's final replaces what it collected, and a
+ * one-field schema has nothing to assemble: its final fills that field or
+ * leaves it as it was.
+ */
+function heldFields(schema: JsonSchema | undefined, collected: unknown): Record<string, unknown> | undefined {
+  const properties = schema?.['properties'];
+  if (
+    typeof properties !== 'object' || properties === null || Object.keys(properties).length < 2 ||
+    typeof collected !== 'object' || collected === null || Array.isArray(collected)
+  ) {
+    return undefined;
+  }
+  const vacuous = new Set(evaluateSubstance({ type: 'object' }, collected).vacuous);
+  const held = Object.fromEntries(Object.entries(collected).filter(([key]) => !vacuous.has(key)));
+  return Object.keys(held).length === 0 ? undefined : held;
 }
 
 /**
@@ -9721,6 +9806,10 @@ export async function runAgent<T = unknown>(
             throwIfCancelled();
             return await page.holds(ref, written);
           },
+          refusedSubmit: async (ref, by) => {
+            throwIfCancelled();
+            return await page.refusedSubmit(ref, by);
+          },
           think: async (prompt) => {
             throwIfCancelled();
             return await page.think(prompt);
@@ -11508,7 +11597,11 @@ export async function runAgent<T = unknown>(
                         action.instruction,
                         framedInstruction(
                           framing,
-                          finalAnswerFraming(req.task, { reasoning: pending.reasoning, elapsedMs: ledger.elapsedMs() }),
+                          finalAnswerFraming(req.task, {
+                            reasoning: pending.reasoning,
+                            elapsedMs: ledger.elapsedMs(),
+                            held: heldFields(req.schema, collected),
+                          }),
                         ),
                         extractBound(),
                         extractSelection(action.instruction),
@@ -12056,6 +12149,23 @@ export async function runAgent<T = unknown>(
                   };
                 }
               }
+              /**
+               * A SUBMIT THE BROWSER REFUSED, and why, from the browser's own
+               * validation: see {@link refusedSubmitCheck}. Asked after every
+               * contradicted click or Enter, and after a confirmed one only on
+               * a button or an Enter, which is where a form is sent from.
+               */
+              const by = action.type === 'click' ? 'click' : action.type === 'press' && action.key === 'Enter' ? 'enter' : undefined;
+              if (
+                by !== undefined &&
+                hasRef(action) &&
+                (pending.check.verdict === 'contradicted' ||
+                  (pending.check.verdict === 'confirmed' &&
+                    (by === 'enter' || findNode(resolvedIn, action.ref)?.role === 'button')))
+              ) {
+                const refused = await page.refusedSubmit(action.ref, by).catch(() => undefined);
+                pending.check = refusedSubmitCheck(pending.check, refused);
+              }
             }
 
             /**
@@ -12098,7 +12208,11 @@ export async function runAgent<T = unknown>(
                   finalAnswerSchema(req.schema) !== undefined
                     ? framedInstruction(
                         framing,
-                        finalAnswerFraming(req.task, { reasoning: pending.reasoning, elapsedMs: ledger.elapsedMs() }),
+                        finalAnswerFraming(req.task, {
+                          reasoning: pending.reasoning,
+                          elapsedMs: ledger.elapsedMs(),
+                          held: heldFields(req.schema, collected),
+                        }),
                       )
                     : undefined,
                 rules: req.rules ?? NO_RULES,
@@ -12635,17 +12749,29 @@ export async function runAgent<T = unknown>(
       // `declined`'s shape, for its reasons: recorded with the refusal the
       // model reads on the next prompt, and not charged to `stepFailures`.
       // What bounds it is FINISH_HOLD_TOLERANCE, above.
+      //
+      // The refusal offers the `done` closure as well as the `failed` one, and
+      // says so at the end of the next prompt, not only in its history line.
+      // Measured 2026-10-13 on one recorded refusal (Scout compare example, a
+      // two-book answer already recorded, its one sub-goal open; a small hands
+      // model, n=12 each): 0 of 12 replies closed the sub-goal with the old
+      // history line, 2 of 12 with the closure added to it, 11 of 12 with the
+      // closure in the line and the notice. The old replies went back to
+      // collect the second book again.
+      const open = heldFinish.map((goal) => `${goal.id} ${goal.goal}`).join('; ');
       record(
         traceOf(
           pending,
           index,
           clock.now() - stepStarted,
           isoTime(wallClock.now()),
-          `done was refused: ${String(heldFinish.length)} sub-goal(s) still open (${heldFinish
-            .map((goal) => `${goal.id} ${goal.goal}`)
-            .join('; ')}). Finish them, or close each one you cannot do with {"goal":{"id":"...","status":"failed","summary":"why"}}.`,
+          `done was refused: ${String(heldFinish.length)} sub-goal(s) still open (${open}). ${CLOSE_GOALS}.`,
         ),
       );
+      momentNotice =
+        `Your done was refused: ${String(heldFinish.length)} sub-goal(s) you stated are still open (${open}), ` +
+        `so the run is not over. ${CLOSE_GOALS} — closing costs you no step, and you may finish ` +
+        'on the same reply.';
       continue;
     }
 

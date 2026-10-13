@@ -17,6 +17,8 @@
  * what it did before this module existed, rather than typing a guess.
  */
 
+import type { AxNode } from './snapshot';
+
 /** The `type` of every input Blink draws as segments. */
 export type NativeDateKind = 'date' | 'time' | 'datetime-local' | 'month' | 'week';
 
@@ -32,6 +34,114 @@ const KINDS: Readonly<Record<string, NativeDateKind>> = {
 export function nativeDateKind(kind: string): NativeDateKind | undefined {
   return KINDS[kind.toLowerCase()];
 }
+
+/**
+ * The field a segment of a native date/time input edits, by the first word of
+ * its accessible name. MEASURED on a fleet Mac, 2026-10-02 (Chrome/154, en-US):
+ * httpbin's `<input type=time>` reads "Hours Hours", "Minutes Minutes",
+ * "AM/PM AM/PM"; a labelled date segment reads "Month Date of Birth". A name
+ * this table does not know (another UI language) reads as no segment.
+ */
+const SEGMENT_FIELD: Readonly<Record<string, string>> = {
+  year: 'year',
+  month: 'month',
+  day: 'day',
+  week: 'week',
+  hours: 'hour',
+  minutes: 'minute',
+  seconds: 'second',
+  milliseconds: 'millisecond',
+  'am/pm': 'ampm',
+};
+
+/** What a separator between two segments may be: punctuation and space, never a word. */
+const SEGMENT_SEPARATOR = /^[\s/.:,–-]+$/u;
+
+/** The fields of the time half of an input; the rest are the date half. */
+const TIME_FIELDS: Readonly<Record<string, true>> = { hour: true, minute: true, second: true, millisecond: true, ampm: true };
+
+/** The field `node` edits when it is a segment, by {@link SEGMENT_FIELD}. */
+export function segmentField(node: AxNode | undefined): string | undefined {
+  if (node?.role !== 'spinbutton') return undefined;
+  return SEGMENT_FIELD[(node.name ?? '').trim().split(/\s+/u)[0]?.toLowerCase() ?? ''];
+}
+
+/** One input's segments among a parent's children: `children[start..end]`. */
+export interface NativeDateRun {
+  readonly start: number;
+  readonly end: number;
+  readonly kind: NativeDateKind;
+}
+
+/**
+ * The native date/time inputs among `children`, as runs of segments in
+ * document order. A segment joins the run before it when it is in the same
+ * frame, edits a field the run lacks, and is one separator away, or directly
+ * adjacent to a segment of the same half (both date fields, or both time
+ * fields); a field met twice starts the next input. Runs whose fields make no
+ * kind are not inputs.
+ *
+ * Adjacent, because the filtered tree drops a separator that is only space:
+ * MEASURED on stock Chromium 2026-10-13 (Playwright's build, en-US), "07:30 pm"
+ * reads Hours ":" Minutes AM/PM and "October 2026" reads Month Year, while the
+ * fork's tree keeps the space before AM/PM (a fleet Mac, 2026-10-02). Only
+ * within one half, because a date's segments directly beside a time's are two
+ * inputs side by side; datetime-local keeps its "," between the halves.
+ */
+export function nativeDateRuns(children: readonly AxNode[]): readonly NativeDateRun[] {
+  const runs: NativeDateRun[] = [];
+  let start = -1;
+  let end = -1;
+  let fields = new Set<string>();
+  const close = (): void => {
+    const has = (field: string): boolean => fields.has(field);
+    const kind: NativeDateKind | undefined =
+      has('hour') && has('minute')
+        ? has('year') && has('month') && has('day')
+          ? 'datetime-local'
+          : has('year') || has('month') || has('day')
+            ? undefined
+            : 'time'
+        : has('year') && has('month')
+          ? has('day')
+            ? 'date'
+            : 'month'
+          : has('year') && has('week')
+            ? 'week'
+            : undefined;
+    if (start >= 0 && kind !== undefined) runs.push({ start, end, kind });
+  };
+  for (let index = 0; index < children.length; index += 1) {
+    const node = children[index] as AxNode;
+    const field = segmentField(node);
+    if (field === undefined) continue;
+    const between = children[end + 1];
+    const joins =
+      start >= 0 &&
+      !fields.has(field) &&
+      node.ref.frameOrdinal === children[end]?.ref.frameOrdinal &&
+      ((index === end + 1 && (TIME_FIELDS[field] === true) === (TIME_FIELDS[segmentField(children[end]) ?? ''] === true)) ||
+        (index === end + 2 && between?.role === 'StaticText' && SEGMENT_SEPARATOR.test(between.name ?? '')));
+    if (!joins) {
+      close();
+      start = index;
+      fields = new Set();
+    }
+    fields.add(field);
+    end = index;
+  }
+  close();
+  return runs;
+}
+
+/** How a whole value of each kind is written into a fill, for the model. */
+export const NATIVE_DATE_FORMAT: Readonly<Record<NativeDateKind, string>> = {
+  time: 'HH:MM',
+  date: 'YYYY-MM-DD',
+  'datetime-local': 'YYYY-MM-DD HH:MM',
+  month: 'YYYY-MM',
+  week: 'YYYY-Www',
+};
 
 const MONTHS = [
   'january',

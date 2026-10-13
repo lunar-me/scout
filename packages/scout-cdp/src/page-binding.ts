@@ -39,7 +39,7 @@
  * {@link WrongTabRefError} for why that refusal names the tab.
  */
 import { DEFAULT_MIN_TEXT_LENGTH, isRecord, optionAliases, systemClock, type JsonSchema } from '@outcrawl/scout-core';
-import { MAX_DRAG_PX, MIN_DRAG_PX, filterTree, findNode, formatNodeRef, framedInstruction, heldPrivately, isReloadKey, isViewportPoint, nativeDateKeys, nativeDateKind, nativeDateValue, nodeRef, walk, type Action, type AgentDeps, type AgentPrompt, type AxNode, type AxTree, type DragAction, type DragEnd, type ExtractBound, type ExtractOutcome, type ExtractSelection, type LookCamera, type LookShot, type ModelChoice, type NodeRef, type PerformOutcome, type SiteCheckResult, type SiteCheckSighting, type TextCaptchaSighting, type ViewportPoint } from '@outcrawl/runtime';
+import { MAX_DRAG_PX, MIN_DRAG_PX, filterTree, findNode, formatNodeRef, framedInstruction, heldPrivately, isReloadKey, isViewportPoint, nativeDateKeys, nativeDateKind, nativeDateRuns, nativeDateValue, nodeRef, walk, type Action, type AgentDeps, type AgentPrompt, type AxNode, type AxTree, type DragAction, type DragEnd, type ExtractBound, type ExtractOutcome, type ExtractSelection, type LookCamera, type LookShot, type NativeDateKind, type RefusedSubmit, type ModelChoice, type NodeRef, type PerformOutcome, type SiteCheckResult, type SiteCheckSighting, type TextCaptchaSighting, type ViewportPoint } from '@outcrawl/runtime';
 import { axTreeFromCdp, frameOrdinalsOf } from './ax-tree';
 import { isCdpTimeout, type CdpPage } from './cdp';
 import { readDocument } from './document';
@@ -57,7 +57,7 @@ import type { HandsContext, HandsPort, HandsStep, HandsTarget, PointerSample } f
 import { selfReleases, sendUntilForwarded } from './input';
 import { asksForDestination, withLinkHrefs } from './link-hrefs';
 import { HIT_SAMPLES, HIT_WINDOW_PX, LANDING_DRAWS, LIST_OPTION_POLL_MS, LIST_OPTION_ROLES, LIST_OPTION_WAIT_MS, LIST_SELECT_SETTLE_MS, MAX_REACH_GESTURE_PX, MAX_REACH_TOTAL_PX, MAX_SCROLLS_TO_REACH, MIN_HITTABLE_PX, PAINTED_DESCENDANT_DEPTH, PAINTED_DESCENDANT_READS, PAINTED_RUN_STEPS, POINT_AIM_PX, REST_EPSILON_PX, SCROLL_PROGRESS_PX, SCROLL_REST_POLL_MS, SCROLL_REST_TIMEOUT_MS, TYPED_LIST_ROLES, normalisedName, textOutsideLists } from './reach';
-import { CLIPPING_SCROLLER, DISMISS_NAME, FILE_INPUT_NEAR, FIXED_OF, FOCUS_TAKES_TEXT, LABELLED_CONTROL_TYPES, MAX_DISMISS_CHECKS, MAX_DISMISS_NAMED, MAX_MIXED_LABEL_READS, MODAL_OF, NATIVE_DATE_HOST, NATIVE_DATE_LAYOUT, SAME_CONTROL, SELECT_OF, asShown, clipFrom, nativeSelect } from './scripts';
+import { CLIPPING_SCROLLER, DISMISS_NAME, FILE_INPUT_NEAR, FIXED_OF, FOCUS_TAKES_TEXT, LABELLED_CONTROL_TYPES, MAX_DISMISS_CHECKS, MAX_DISMISS_NAMED, MAX_MIXED_LABEL_READS, MAX_NATIVE_DATE_READS, MODAL_OF, NATIVE_DATE_HOST, NATIVE_DATE_LAYOUT, SAME_CONTROL, SELECT_OF, asShown, clipFrom, nativeSelect, refusedSubmit } from './scripts';
 
 /**
  * The `Outcrawl.getAXTree` node ceiling this binding asks for, well above the
@@ -1159,11 +1159,53 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
     // Before `withoutParked`, which resolves refs through `sessionFor`.
     tabFrames = frameOrdinalsOf(reply);
     forgetFrameOwners();
-    const resolved = await withRadioLabelsResolved(tree);
+    const resolved = await withNativeDateFields(await withRadioLabelsResolved(tree));
     const shown = parked.size === 0 && covered.size === 0 ? resolved : await withoutParked(resolved);
     if (!conceal) return shown;
     const mask = tab?.masking?.tree;
     return mask === undefined ? shown : await mask(shown);
+  }
+
+  /**
+   * `tree` with the first segment of each native date/time input marked
+   * `nativeDate`, which the prompt renders as how to fill the whole value.
+   *
+   * The tree shows such an input only as its segments, "Hours Hours"="0" and
+   * the rest, and nothing says one fill takes the whole time. MEASURED
+   * 2026-10-13 on httpbin's pizza form (the hands model by role): of 10
+   * form-fill runs, 9 sent the order with delivery "" (7 on stock Chromium, 2
+   * on the fleet) and 1 failed on the blocked submit, after selecting "7" in
+   * Hours, typing "7" there, or planning the segments and never filling them.
+   *
+   * Marked only where the element IS one of Blink's segments (its `pseudo`
+   * attribute, read with `DOM.describeNode`; DevTools-side, page-invisible),
+   * because a whole-value fill works only there (`nativeDatePlan`); an ARIA
+   * widget whose parts happen to be named Hours or Month is left alone. One
+   * read per input, only on a page that has segment-named spinbuttons.
+   */
+  async function withNativeDateFields(tree: AxTree): Promise<AxTree> {
+    const marked = new Map<string, NativeDateKind>();
+    for (const node of walk(tree)) {
+      const children = node.children ?? [];
+      for (const run of nativeDateRuns(children)) {
+        const first = children[run.start];
+        if (first === undefined || marked.size >= MAX_NATIVE_DATE_READS) continue;
+        try {
+          const { page: session, backendNodeId } = await sessionFor(first.ref);
+          const pseudo = (await elementOf(session, backendNodeId))?.attribute('pseudo') ?? '';
+          if (pseudo.startsWith('-webkit-datetime-edit-')) marked.set(formatNodeRef(first.ref), run.kind);
+        } catch {
+          // A segment this read cannot reach keeps its plain line.
+        }
+      }
+    }
+    if (marked.size === 0) return tree;
+    const mark = (node: AxNode): AxNode => {
+      const kind = marked.get(formatNodeRef(node.ref));
+      const own = kind === undefined ? node : { ...node, state: { ...node.state, nativeDate: kind } };
+      return own.children === undefined ? own : { ...own, children: own.children.map(mark) };
+    };
+    return { ...tree, root: mark(tree.root) };
   }
 
   /**
@@ -2687,6 +2729,27 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
   }
 
   /**
+   * Whether `ref` is a native `<input type=date|time|datetime-local|month|week>`
+   * or one of its segments. Reads only: `DOM.describeNode` first, so anything
+   * that is neither a spinbutton nor such an input pays one round trip, then
+   * {@link NATIVE_DATE_HOST} in the look world.
+   */
+  async function isNativeDateField(ref: NodeRef): Promise<boolean> {
+    const { page: session, backendNodeId: id } = await sessionFor(ref);
+    const element = await elementOf(session, id).catch(() => undefined);
+    if (
+      element === undefined ||
+      !(element.attribute('role') === 'spinbutton' || (element.tag === 'input' && nativeDateKind(element.attribute('type') ?? '') !== undefined))
+    ) {
+      return false;
+    }
+    const frameId = await frameIdOf(session, ref).catch(() => undefined);
+    if (frameId === undefined) return false;
+    const host = await inLookWorld(session, frameId, { on: id, declaration: NATIVE_DATE_HOST, returns: 'node' }).catch(() => undefined);
+    return typeof host === 'number';
+  }
+
+  /**
    * A fill into a native date/time input, as one `[segment, keys]` per
    * segment in drawn order; `undefined` when `ref` is not such an input or
    * one of its segments, or `text` is not a value of its kind in any shape
@@ -3244,6 +3307,26 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
   }
 
   /**
+   * `AgentDeps.refusedSubmit`: the form a click or Enter on `ref` sends, when
+   * the browser's own validation refuses it. One read in the look world (see
+   * {@link refusedSubmit}): properties only, so the page sees no event, no
+   * call into its own script and no global (probed on stock Chromium by
+   * `stock-chromium.test.ts`). Anything unreadable answers `undefined`.
+   */
+  async function refusedSubmitOf(ref: NodeRef, by: 'click' | 'enter'): Promise<RefusedSubmit | undefined> {
+    const read = (await inSelectWorld(ref, refusedSubmit(by)))?.outcome;
+    if (!isRecord(read) || !Array.isArray(read['fields'])) return undefined;
+    const fields = read['fields']
+      .filter(isRecord)
+      .map((field) => ({
+        label: typeof field['label'] === 'string' ? field['label'] : '',
+        message: typeof field['message'] === 'string' ? field['message'] : '',
+      }))
+      .filter((field) => field.message !== '');
+    return fields.length === 0 ? undefined : { fields, focused: read['focused'] === true };
+  }
+
+  /**
    * A select on something that is NOT a native `<select>`: an ARIA combobox,
    * a listbox, or one of their options. Driven the way a person drives one,
    * through the same hands every other input takes, and then checked.
@@ -3423,6 +3506,7 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
   const bound: AgentDeps = {
     snapshot,
     holds,
+    refusedSubmit: refusedSubmitOf,
     capture,
     /**
      * THE DOCUMENT, FOR THE SETTLE'S CHALLENGE GATE.
@@ -3552,7 +3636,13 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
           }
           await asWritten(action.value, value, async () => {
             if ((await performSelect(action.ref, value)) === 'custom') {
-              await performListSelect(action.ref, value);
+              // A segment of a native date or time input has no options: a
+              // person chooses its value by typing it, which is a fill. MEASURED
+              // 2026-10-13 (form-fill-a1..a3, stock Chromium): 3 of 3 runs
+              // first asked to select "7" in httpbin's Hours segment and were
+              // refused "no option named "7" appeared".
+              if (await isNativeDateField(action.ref)) await performFill(action.ref, action.value);
+              else await performListSelect(action.ref, value);
             }
           });
           return;

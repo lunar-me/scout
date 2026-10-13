@@ -179,6 +179,38 @@ describe('with the switch on the loop asks what the action did', () => {
   });
 });
 
+describe('a submit the browser refused is contradicted with its reason', () => {
+  const INVALID = { label: 'Preferred delivery time:', message: 'Value must be 11:00 AM or later.' };
+  const REASON = 'the browser did not send the form, because a field is invalid: "Preferred delivery time:": Value must be 11:00 AM or later.';
+
+  test.each([
+    ['nothing changed', false, false, 'contradicted', `nothing on the page changed; ${REASON}`],
+    ['the page changed and the invalid field took focus', true, true, 'contradicted', REASON],
+    ['the page changed and focus stayed elsewhere', true, false, 'confirmed', undefined],
+  ] as const)('%s', async (_case, changed, focused, verdict, saw) => {
+    const h = harness({
+      model: clickThenDone,
+      snapshot: (call) => (call === 0 || !changed ? shop() : shop({ disabled: true })),
+    });
+    const asked: string[] = [];
+    const deps: AgentDeps = {
+      ...h.deps,
+      refusedSubmit: (ref, by) => {
+        asked.push(`${by}@${String(ref.backendNodeId)}`);
+        return { fields: [INVALID], focused };
+      },
+    };
+    const result = await runAgent(deps, { task: 'order', caps: CAPS, stepFailures: 3, settle: false, verify: true });
+
+    expect(asked).toEqual(['click@501']);
+    expect(result.steps[0]?.check?.verdict).toBe(verdict);
+    if (saw !== undefined) {
+      expect(result.steps[0]?.check?.saw).toBe(saw);
+      expect(h.prompts[1]?.text).toContain(`-> no effect: ${saw}`);
+    }
+  });
+});
+
 describe('a lock the navigation took away does not blind the check', () => {
   /**
    * THE DEFECT THIS WHOLE FILE WAS FAILING TO CATCH.

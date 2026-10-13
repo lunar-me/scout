@@ -16,28 +16,20 @@ const scout = new Scout({ browser: { launch: {} }, models: modelsFromEnv() });
 
 const result = await scout.run(
   'On https://books.toscrape.com find the books "A Light in the Attic" and "Tipping the Velvet". ' +
-    "Open each book's own page and report its price, star rating and availability, then say which is cheaper.",
+    "Open each book's own page and report its price and how many copies are in stock, then say which is cheaper.",
   {
     caps: { steps: 30, duration: '8m' },
+    // One named field per book rather than a list: Scout merges what each page
+    // gives it field by field, so the first book's details survive while it
+    // reads the second book's page. A list is replaced whole by each new read.
     schema: {
       type: 'object',
       properties: {
-        books: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              title: { type: 'string' },
-              price: { type: 'string' },
-              rating: { type: 'string' },
-              availability: { type: 'string' },
-            },
-            required: ['title', 'price', 'rating', 'availability'],
-          },
-        },
-        cheaper: { type: 'string' },
+        lightInTheAttic: book(),
+        tippingTheVelvet: book(),
+        cheaper: { type: 'string', description: 'The title of the cheaper book' },
       },
-      required: ['books', 'cheaper'],
+      required: ['lightInTheAttic', 'tippingTheVelvet', 'cheaper'],
     },
   },
 );
@@ -45,3 +37,14 @@ const result = await scout.run(
 console.log(result.status, `${String(result.pages)} pages, ${String(result.stepsUsed)} steps`);
 console.log(JSON.stringify(result.data, null, 2));
 for (const goal of result.goals ?? []) console.log(`goal ${goal.id}: ${goal.status}`);
+
+function book() {
+  return {
+    type: 'object',
+    properties: {
+      price: { type: 'string' },
+      inStock: { type: 'integer', description: 'How many copies are in stock' },
+    },
+    required: ['price', 'inStock'],
+  };
+}

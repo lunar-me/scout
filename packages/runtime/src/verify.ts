@@ -74,7 +74,7 @@ import { CONCEALED_FIELD_VALUE, optionAliases, siteOf, type Clock } from '@outcr
 
 import type { Action } from './actions';
 import { describeAction, isReloadKey } from './actions';
-import { monthOfName, nativeDateValue, type NativeDateKind } from './native-date';
+import { monthOfName, nativeDateRuns, nativeDateValue, segmentField, type NativeDateKind } from './native-date';
 import type { AxNode, AxTree, NodeRef } from './snapshot';
 import { findNode, formatNodeRef, hashSnapshot, walk } from './snapshot';
 
@@ -330,29 +330,6 @@ function continuedValue(tree: AxTree, target: AxNode, typed: string): string | u
   return undefined;
 }
 
-/**
- * The field a segment of a native date/time input edits, by the first word of
- * its accessible name. MEASURED on a fleet Mac, 2026-10-02 (Chrome/154, en-US):
- * httpbin's `<input type=time>` reads "Hours Hours", "Minutes Minutes",
- * "AM/PM AM/PM"; a labelled date segment reads "Month Date of Birth". A name
- * this table does not know (another UI language) reads nothing here, and the
- * check falls back to the comparisons above it.
- */
-const SEGMENT_FIELD: Readonly<Record<string, string>> = {
-  year: 'year',
-  month: 'month',
-  day: 'day',
-  week: 'week',
-  hours: 'hour',
-  minutes: 'minute',
-  seconds: 'second',
-  milliseconds: 'millisecond',
-  'am/pm': 'ampm',
-};
-
-/** What a separator between two segments may be: punctuation and space, never a word. */
-const SEGMENT_SEPARATOR = /^[\s/.:,–-]+$/u;
-
 interface SegmentedRead {
   /** The kind of input the segments make up, from the fields they edit. */
   readonly kind: NativeDateKind;
@@ -373,53 +350,45 @@ interface SegmentedRead {
  * it, which is `19:30` in the input. MEASURED on a fleet Mac, 2026-10-02, n=3:
  * that fill leaves `input.value === "19:30"`, and a production run (the brain model)
  * was told it was contradicted because "07" is not "1930".
+ *
+ * Two segments may also sit side by side with no separator (see
+ * {@link nativeDateRuns}), and a segment reads what it SHOWS before its value.
+ * MEASURED on stock Chromium 2026-10-13 (Playwright's build, en-US, n=1 per
+ * shape): each segment carries a value as well as its text, "7" beside "07",
+ * "2" beside "pm", "0" beside "--" when empty. Read by value and stopped at
+ * the missing space before AM/PM, a fill that left `input.value === "19:30"`
+ * was told it read "7:30, which is 07:30, not 19:30".
  */
 function segmentedRead(tree: AxTree, target: AxNode): SegmentedRead | undefined {
   if (target.role !== 'spinbutton') return undefined;
-  const isSegment = (node: AxNode | undefined): node is AxNode =>
-    node?.role === 'spinbutton' && node.ref.frameOrdinal === target.ref.frameOrdinal;
-  const isSeparator = (node: AxNode | undefined): boolean =>
-    node?.role === 'StaticText' && SEGMENT_SEPARATOR.test(node.name ?? '');
   for (const parent of walk(tree)) {
     const children = parent.children;
     if (children === undefined) continue;
     const at = children.indexOf(target);
     if (at < 0) continue;
-    let start = at;
-    while (isSeparator(children[start - 1]) && isSegment(children[start - 2])) start -= 2;
-    let end = at;
-    while (isSeparator(children[end + 1]) && isSegment(children[end + 2])) end += 2;
+    const run = nativeDateRuns(children).find(({ start, end }) => start <= at && at <= end);
+    if (run === undefined) return undefined;
     const fields = new Map<string, string>();
     let shown = '';
-    for (let index = start; index <= end; index += 1) {
+    for (let index = run.start; index <= run.end; index += 1) {
       const node = children[index] as AxNode;
-      if (index % 2 !== start % 2) {
+      const field = segmentField(node);
+      if (field === undefined) {
         shown += node.name ?? '';
         continue;
       }
-      const field = SEGMENT_FIELD[normalise(node.name).split(' ')[0]?.toLowerCase() ?? ''];
-      if (field === undefined || fields.has(field)) return undefined;
-      const text = readBack(node);
+      if (index > run.start && segmentField(children[index - 1]) !== undefined) shown += ' ';
+      const drawn = normalise(
+        (node.children ?? [])
+          .filter((child) => child.role === 'StaticText')
+          .map((child) => child.name ?? '')
+          .join(' '),
+      );
+      const text = drawn === '' ? readBack(node) : drawn;
       fields.set(field, text);
       shown += text;
     }
-    const has = (field: string): boolean => fields.has(field);
-    const kind: NativeDateKind | undefined =
-      has('hour') && has('minute')
-        ? has('year') && has('month') && has('day')
-          ? 'datetime-local'
-          : has('year') || has('month') || has('day')
-            ? undefined
-            : 'time'
-        : has('year') && has('month')
-          ? has('day')
-            ? 'date'
-            : 'month'
-          : has('year') && has('week')
-            ? 'week'
-            : undefined;
-    if (kind === undefined) return undefined;
-    return { kind, value: segmentedValue(kind, fields), shown, fields };
+    return { kind: run.kind, value: segmentedValue(run.kind, fields), shown, fields };
   }
   return undefined;
 }
@@ -1305,6 +1274,53 @@ export async function checkAction(
     reads,
     elapsedMs,
     ...failure,
+  };
+}
+
+/**
+ * A form the browser would not send, as the host read it after a click or an
+ * Enter that could have submitted it: each control that fails the browser's
+ * own constraint validation, by its label and the browser's own
+ * `validationMessage`, in form order. `focused` is whether the first of them
+ * holds focus, which is where the browser puts it when it refuses a submit.
+ */
+export interface RefusedSubmit {
+  readonly fields: readonly { readonly label: string; readonly message: string }[];
+  readonly focused: boolean;
+}
+
+/** The longest validation message quoted; a page's custom message can be a paragraph. */
+const MAX_VALIDATION_MESSAGE_CHARS = 160;
+
+/**
+ * The check on a click or Enter that tried to send a form the browser refused.
+ *
+ * A refused submit changes nothing a tree shows: the browser's bubble is not
+ * in the page, so the model was told "nothing on the page changed", or `ok`
+ * when something else moved, and nothing said why. MEASURED 2026-10-13 on
+ * stock Chromium (form-fill-a3, httpbin's pizza form): a time field left
+ * incomplete blocked the submit, the model clicked "Submit order" five times
+ * and the run ended on the repeat.
+ *
+ * A contradiction keeps what it saw and adds the reason. A confirmed check is
+ * turned into a contradiction only when the first invalid field holds focus,
+ * which is the browser's own mark of a refused submit; anything else moved by
+ * the click stays the page's business.
+ */
+export function refusedSubmitCheck(check: CheckTrace, refused: RefusedSubmit | undefined): CheckTrace {
+  if (refused === undefined || refused.fields.length === 0 || check.verdict === 'unchecked') return check;
+  if (check.verdict === 'confirmed' && (!refused.focused || check.download !== undefined)) return check;
+  const reasons = refused.fields
+    .map(({ label, message }) => {
+      const said = message.length > MAX_VALIDATION_MESSAGE_CHARS ? `${message.slice(0, MAX_VALIDATION_MESSAGE_CHARS)}…` : message;
+      return label === '' ? said : `${JSON.stringify(label)}: ${said}`;
+    })
+    .join('; ');
+  const refusal = `the browser did not send the form, because a field is invalid: ${reasons}`;
+  return {
+    ...check,
+    verdict: 'contradicted',
+    saw: check.verdict === 'contradicted' ? `${check.saw}; ${refusal}` : refusal,
   };
 }
 

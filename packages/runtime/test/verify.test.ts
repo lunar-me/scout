@@ -398,6 +398,35 @@ describe('a typed value is judged on what the field reads back', () => {
     expect(checkOutcome(timeFill('19'), timeInput('07', '--', 'AM')).verdict).toBe('contradicted');
   });
 
+  /**
+   * The same input as stock Chromium's tree shows it, MEASURED 2026-10-13
+   * (Playwright's build, en-US): each segment carries a value beside the text
+   * it draws ("7" beside "07", "2" beside "pm", "0" beside "--"), and no
+   * separator stands between Minutes and AM/PM.
+   */
+  function stockTimeInput(hours: [string, string], minutes: [string, string], ampm: [string, string]): AxTree {
+    const segment = (name: string, at: number, [value, text]: [string, string]): AxNode =>
+      node({ role: 'spinbutton', name, value, ref: at === 52 ? HOURS : nodeRef(0, at), children: [node({ role: 'StaticText', name: text })] });
+    return page({
+      extra: [
+        segment('Hours Hours', 52, hours),
+        node({ role: 'StaticText', name: ':' }),
+        segment('Minutes Minutes', 54, minutes),
+        segment('AM/PM AM/PM', 56, ampm),
+        segment('Hours Hours', 58, ['0', '--']),
+      ],
+    });
+  }
+
+  test('a stock tree is read by what each segment shows, across a gap before AM/PM, and only for its own input', () => {
+    const landed = checkOutcome(timeFill('19:30'), stockTimeInput(['7', '07'], ['30', '30'], ['2', 'pm']));
+    expect(landed.verdict).toBe('confirmed');
+    expect(landed.saw).toBe('the input reads "07:30 pm", which is 19:30');
+    const empty = checkOutcome(timeFill('19:30'), stockTimeInput(['7', '07'], ['30', '30'], ['0', '--']));
+    expect(empty.verdict).toBe('contradicted');
+    expect(empty.saw).toContain('"07:30 --", which is not a complete value');
+  });
+
   test('a date is judged on the fields its segments are named for, not on their order', () => {
     const MONTH_SEGMENT = nodeRef(0, 60);
     const dateInput = (first: [string, string], second: [string, string]): AxTree =>

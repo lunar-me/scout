@@ -1,5 +1,5 @@
 import { DEFAULT_MIN_TEXT_LENGTH, type JsonSchema } from '@outcrawl/scout-core';
-import type { Action, AgentDeps, AgentPrompt, AxTree, ExtractBound, ExtractOutcome, ExtractSelection, ModelChoice, NodeRef, PageView, PerformOutcome, SettledDocument, TabControl, TabId, TabInfo, TabPage } from '@outcrawl/runtime';
+import type { Action, AgentDeps, AgentPrompt, AxTree, ExtractBound, ExtractOutcome, ExtractSelection, ModelChoice, NodeRef, PageView, PerformOutcome, RefusedSubmit, SettledDocument, TabControl, TabId, TabInfo, TabPage } from '@outcrawl/runtime';
 import { CrossFrameRefError } from './errors';
 import type { BindingOptions } from './options';
 import { fanHolds } from './input';
@@ -270,6 +270,10 @@ export function tabbedBinding(tabs: AgentTabs, options: BindingOptions): AgentDe
     // The FOCUSED tab, the one `snapshot` above read the field off.
     async holds(ref: NodeRef, written: string): Promise<boolean | undefined> {
       return (await focused()).deps.holds?.(ref, written);
+    },
+
+    async refusedSubmit(ref: NodeRef, by: 'click' | 'enter'): Promise<RefusedSubmit | undefined> {
+      return (await focused()).deps.refusedSubmit?.(ref, by);
     },
 
     async capture(): Promise<PageView> {
