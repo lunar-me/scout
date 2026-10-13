@@ -449,6 +449,14 @@ export interface StepTrace {
   readonly observed?: ObservedAction;
   /** What the model said it was doing. */
   readonly reasoning?: string;
+  /**
+   * The further actions this step's reply listed after the one performed, none
+   * of which ran, as short labels (`fill "E-mail address:"`). The next prompt
+   * names them as not run: a small model otherwise acts as if its list had been
+   * carried out and submits a form with fields still empty. Absent when the
+   * reply listed nothing else.
+   */
+  readonly unrun?: readonly string[];
   /** Reasoning tokens for this step, when the model reports them. */
   readonly reasoningTokens?: number;
   /**

@@ -22,7 +22,7 @@ const scout = new Scout({ browser: { launch: {} }, models: modelsFromEnv() });
 // signed-in page shows sometimes moves on before it has read that page.
 const result = await scout.run(
   `Go to https://practicetestautomation.com/practice-test-login/ and sign in with username "${username}" and ` +
-    `password "${password}". Then extract the heading and the message of the page you reach.`,
+    `password "${password}". Once you are signed in, extract the heading and the message of the page that welcomes you.`,
   {
     caps: { steps: 25, duration: '10m' },
     schema: {

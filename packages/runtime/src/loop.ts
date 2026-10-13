@@ -6224,6 +6224,62 @@ export function compactHistory(
   return lines;
 }
 
+/** At most this many of a reply's unperformed actions are named. */
+const NOT_RUN_SHOWN = 8;
+
+/**
+ * THE ACTIONS THE LAST REPLY LISTED AND THE LOOP DID NOT PERFORM, named once,
+ * just before the demand, and only for the step just taken.
+ *
+ * The reply asks for one action and then for further actions the same
+ * snapshot supports; only the first runs, and the system prompt says so. A
+ * small hands model still reads its own list back as done: it submits the form
+ * with the fields it listed still empty. Measured 2026-10-13 by replaying 14
+ * recorded form-fill decision prompts where that happened (a small hands
+ * model): it submitted on 40 of 95 replies as recorded and on 5 of 112 with
+ * this line; on 13 form and login controls it was right 61 of 65 and 64 of 65;
+ * the production hands role, 0 of 40 both ways. The same names on the newest
+ * history line did less (25 of 153), and rewording the system prompt alone did
+ * nothing (16 of 42) and cut the further actions other callers read.
+ *
+ * The last step only: each reply restates the plan, and the page shows what an
+ * older step set.
+ */
+function notRunLine(unrun: readonly string[]): string {
+  const more = unrun.length - NOT_RUN_SHOWN;
+  return `Your last reply also listed these; none of them ran: ${unrun.slice(0, NOT_RUN_SHOWN).join(', ')}${
+    more > 0 ? ` and ${String(more)} more` : ''
+  }.`;
+}
+
+/**
+ * A reply's further actions, minus the one performed, as short labels: the
+ * verb and the node's name (`fill "E-mail address:"`). Invalid ones are
+ * dropped, as the model client drops them. `undefined` when none remain.
+ */
+function unrunLabels(listed: readonly Action[], performed: Action, tree: AxTree): readonly string[] | undefined {
+  const performedKey = JSON.stringify(performed);
+  const labels: string[] = [];
+  for (const candidate of listed) {
+    const validated = validateAction(candidate, tree);
+    if (!validated.ok || JSON.stringify(validated.value) === performedKey) {
+      continue;
+    }
+    const action = validated.value;
+    const node = hasRef(action) ? findNode(tree, action.ref) : undefined;
+    const label =
+      node === undefined
+        ? action.type
+        : node.name === undefined
+          ? `${action.type} the ${node.role}`
+          : `${action.type} ${JSON.stringify(node.name)}`;
+    if (!labels.includes(label)) {
+      labels.push(label);
+    }
+  }
+  return labels.length === 0 ? undefined : labels;
+}
+
 /**
  * How many tokens of serialized page one actuator step may be shown.
  *
@@ -6724,6 +6780,12 @@ export function renderPrompt(prompt: Omit<AgentPrompt, 'text'>): string {
   // block worth caching. See `renderFanTrees` for the shared budget.
   if (prompt.tabTrees !== undefined && prompt.tabTrees.length > 0) {
     lines.push(...renderFanTrees(prompt.tabTrees));
+  }
+
+  // 5c. What the last reply listed and the loop did not perform. See `notRunLine`.
+  const unrun = prompt.history.at(-1)?.unrun;
+  if (unrun !== undefined && unrun.length > 0) {
+    lines.push(notRunLine(unrun));
   }
 
   // 6. The demand, in the position it has always occupied. See the header.
@@ -7853,6 +7915,7 @@ interface PendingStep {
   ref: NodeRef | undefined;
   observed: ObservedAction | undefined;
   reasoning: string | undefined;
+  unrun: readonly string[] | undefined;
   reasoningTokens: number | undefined;
   modelRank: number | undefined;
   cache: CacheInfo;
@@ -7989,6 +8052,7 @@ function traceOf(
     ...(pending.ref !== undefined ? { ref: pending.ref } : {}),
     ...(pending.observed !== undefined ? { observed: pending.observed } : {}),
     ...(pending.reasoning !== undefined ? { reasoning: pending.reasoning } : {}),
+    ...(pending.unrun !== undefined ? { unrun: pending.unrun } : {}),
     ...(pending.reasoningTokens !== undefined ? { reasoningTokens: pending.reasoningTokens } : {}),
     ...(pending.modelRank !== undefined ? { modelRank: pending.modelRank } : {}),
     cache: pending.cache,
@@ -10342,6 +10406,7 @@ export async function runAgent<T = unknown>(
       ref: undefined,
       observed: undefined,
       reasoning: undefined,
+      unrun: undefined,
       reasoningTokens: undefined,
       modelRank: undefined,
       cache: defaultCache,
@@ -10979,6 +11044,8 @@ export async function runAgent<T = unknown>(
             let chain: readonly unknown[] = [];
             /** `Envelope.also`, raw. Empty on every serial step. */
             let also: readonly unknown[] = [];
+            /** The reply's further actions, none of them performed. See `StepTrace.unrun`. */
+            let listed: readonly Action[] = [];
             let moved: string | undefined;
             if (host !== undefined) {
               // No model call and no cache entry: the code is this image's
@@ -10996,6 +11063,7 @@ export async function runAgent<T = unknown>(
               pending.reasoning = choice.reasoning;
               pending.reasoningTokens = choice.usage?.reasoningTokens;
               pending.modelRank = choice.modelRank;
+              listed = choice.alternatives ?? [];
               // MERGED, not assigned: a step that looked twice made two model
               // calls and the customer is billed for both, so the trace has to
               // carry both. Assignment would report the second call's tokens as
@@ -11064,6 +11132,7 @@ export async function runAgent<T = unknown>(
               moved = refresh.reason;
             }
             pending.action = action;
+            pending.unrun = unrunLabels(listed, action, tree);
             if (hasRef(action)) {
               pending.ref = action.ref;
               const node = findNode(resolvedIn, action.ref);

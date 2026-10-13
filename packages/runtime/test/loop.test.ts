@@ -2250,3 +2250,34 @@ describe('a tool call leaves its verdict, and only its port\u2019s note, on the 
     expect(result.steps[0]?.tool?.note).toHaveLength(MAX_TOOL_NOTE_CHARS);
   });
 });
+
+describe('only the first listed action runs, and the next prompt says which did not', () => {
+  const count = (text: string | undefined, needle: string): number => (text ?? '').split(needle).length - 1;
+
+  test('the next prompt names the listed actions that did not run, never the performed one, and a later prompt drops them', async () => {
+    const prompts: string[] = [];
+    const scroll: Action = { type: 'scroll', dy: 600 };
+    const h = harness({
+      tree: page,
+      model: (prompt, step) => {
+        prompts.push(prompt.text);
+        if (step === 0) {
+          // The performed action listed again among the rest, as models do.
+          return { action: click, alternatives: [click, { type: 'click', ref: widget }] };
+        }
+        return step === 1 ? { action: scroll } : { action: done };
+      },
+    });
+
+    await runAgent(h.deps, { task: 'search', caps: CAPS, stepFailures: null, settle: false });
+
+    expect(h.performed).toEqual([click, scroll]);
+    // The page is the same on every prompt, so any extra mention is the loop's.
+    // After step 0: the unperformed widget click is named once more than the page
+    // names it; the performed search click only by its own history line.
+    expect(count(prompts[1], '"Widget A"')).toBe(count(prompts[0], '"Widget A"') + 1);
+    expect(count(prompts[1], '"Search"')).toBe(count(prompts[0], '"Search"') + 1);
+    // After step 1, which listed nothing, that list is stale and not named.
+    expect(count(prompts[2], '"Widget A"')).toBe(count(prompts[0], '"Widget A"'));
+  });
+});
