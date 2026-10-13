@@ -30,14 +30,14 @@ Scout is an open-source agent that uses a real browser to finish a task for you.
 
 **Scout runs best on Outcrawl's cloud.** One line gives it a browser that sites treat like anyone at home, with captcha solving and a replay of every run. It also runs on your own machine.
 
-<!-- DEMO: replace this still with a GIF or video of a real Scout run (recorded after wave 2 merges), same width, light and dark. Never a staged run. -->
 <p>
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/still-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset=".github/assets/still-light.png">
-  <img alt="The whole program: create a Scout with a browser and a model, then run one task in plain words." src=".github/assets/still-light.png" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/demo-dark.gif">
+  <source media="(prefers-color-scheme: light)" srcset=".github/assets/demo-light.gif">
+  <img alt="A recorded Scout run on Outcrawl's cloud, at 6x speed. The task: Go to https://books.toscrape.com, open the first book in the Poetry category and report its title and price. Scout opens the shop, clicks Poetry, opens the first book and answers: title A Light in the Attic, price £51.77. Completed in 5 steps." src=".github/assets/demo-light.gif" width="100%">
 </picture>
 </p>
+<p align="center"><sub>A recorded run on Outcrawl's cloud, 13 October 2026, shown at 6x speed with nothing cut.</sub></p>
 
 ## Start in three steps
 
@@ -79,7 +79,7 @@ console.log(result.replayUrl); // watch the whole run, step by step
 
 Scout opens a browser on Outcrawl's cloud, works through the page, and prints the answer with a link to the replay.
 
-**Rather use a browser on your own machine?** Install one with `npm i playwright-core && npx playwright install chromium`, then change the one line to `browser: { launch: {} }`. Add `headless: false` inside `launch` to watch it work.
+**Rather use a browser on your own machine?** Install one with `npm i playwright-core && npx playwright install chromium`, then change the one line to `browser: { launch: {} }`. Add `headless: false` inside `launch` to watch it work. Replays come with the cloud, so `replayUrl` stays empty on your own browser.
 
 > [!TIP]
 > Not writing the code yourself? Give this page to your coding agent and ask it to set Scout up and run your task.

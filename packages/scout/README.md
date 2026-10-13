@@ -12,6 +12,14 @@ It is the agent behind Outcrawl's hosted agent, published as it runs there: the 
 - **Your models, one per job.** Any endpoint that speaks the chat completions API: a hosted provider, a gateway, or a server on your own machine. There is no default model.
 - **An answer even when a run falls short.** A run that hits a limit or cannot finish still returns what it found, and says what is missing.
 
+<p>
+<a href="https://github.com/outcrawlai/scout#readme">
+  <img alt="The end of a recorded Scout run on Outcrawl's cloud. Task: Go to https://books.toscrape.com, open the first book in the Poetry category and report its title and price. Answer: title A Light in the Attic, price £51.77. Completed in 5 steps." src="https://raw.githubusercontent.com/outcrawlai/scout/main/.github/assets/demo-light.png" width="100%">
+</a>
+</p>
+
+The end of a recorded run on Outcrawl's cloud, 13 October 2026. [Watch the whole run on GitHub](https://github.com/outcrawlai/scout#readme).
+
 ## Start in three steps
 
 **1. Install Scout.** Node 22 or later, or Bun. On Outcrawl's cloud there is no browser to install.
@@ -64,7 +72,7 @@ console.log(result.replayUrl); // the whole run, step by step
 
 You see each step as it happens, then something like `completed { title: '...', price: '£..' }` and the replay link.
 
-**Rather use a browser on your own machine?** Install `playwright-core` (or `puppeteer-core`) and a browser with `npm i playwright-core && npx playwright install chromium`, then change the one line to `browser: { launch: {} }`. Pass `browser: { launch: { headless: false } }` to watch it work.
+**Rather use a browser on your own machine?** Install `playwright-core` (or `puppeteer-core`) and a browser with `npm i playwright-core && npx playwright install chromium`, then change the one line to `browser: { launch: {} }`. Pass `browser: { launch: { headless: false } }` to watch it work. Replays come with the cloud, so `replayUrl` stays empty on your own browser.
 
 ## Models
 
