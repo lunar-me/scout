@@ -1,0 +1,23 @@
+{
+  "name": "scout",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Scout, an open-source browser agent.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/outcrawlai/scout.git"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "fail=\"\"; for p in packages/*/; do [ -d \"$p/test\" ] || continue; echo \"-- $p\"; (cd \"$p\" && bun test ./test) || fail=\"$fail $p\"; done; [ -z \"$fail\" ] || { echo \"FAILED:$fail\" >&2; exit 1; }",
+    "typecheck": "for p in packages/*/; do [ -f \"$p/tsconfig.test.json\" ] || continue; (cd \"$p\" && tsc --noEmit -p tsconfig.test.json) || exit 1; done"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.0"
+  }
+}

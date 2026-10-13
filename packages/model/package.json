@@ -1,0 +1,31 @@
+{
+  "name": "@outcrawl/model",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The model client: satisfies AgentDeps.model and PipelineDeps.extractJson, schema-constrained on the way out so prose where JSON was promised is an error rather than an empty extraction, and every call priced into a per-session ledger. Names no model: the host injects the plan (which model per role), the rate card and the provider. Holds the key, opens exactly one kind of socket, and drives no browser.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./provider": "./src/provider.ts",
+    "./http": "./src/http.ts",
+    "./chat-completions": "./src/chat-completions.ts",
+    "./rates": "./src/rates.ts",
+    "./schema": "./src/schema.ts",
+    "./ledger": "./src/ledger.ts",
+    "./client": "./src/client.ts",
+    "./harness": "./src/harness.ts",
+    "./brain": "./src/brain.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "bun test ./test"
+  },
+  "dependencies": {
+    "@outcrawl/runtime": "workspace:*",
+    "@outcrawl/scout-core": "workspace:*"
+  }
+}

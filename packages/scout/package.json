@@ -1,0 +1,76 @@
+{
+  "name": "@outcrawl/scout",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "Scout, the open-source browser agent behind Outcrawl's hosted agent. Give it a task in plain words and it reads, clicks, types and extracts on any Chromium: a local browser, any CDP endpoint, or Outcrawl's cloud. Bring your own models, one per role, over any chat-completions endpoint.",
+  "keywords": [
+    "browser-agent",
+    "ai-agent",
+    "browser-automation",
+    "cdp",
+    "chromium",
+    "playwright",
+    "puppeteer",
+    "web-agent",
+    "llm",
+    "outcrawl"
+  ],
+  "homepage": "https://outcrawl.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/outcrawlai/scout.git",
+    "directory": "packages/scout"
+  },
+  "bugs": {
+    "url": "https://github.com/outcrawlai/scout/issues"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist/index.js",
+    "dist/types",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "bun ./scripts/build.ts",
+    "prepack": "bun ./scripts/build.ts",
+    "test": "bun test ./test"
+  },
+  "peerDependencies": {
+    "playwright-core": "*",
+    "puppeteer-core": "*"
+  },
+  "peerDependenciesMeta": {
+    "playwright-core": {
+      "optional": true
+    },
+    "puppeteer-core": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@outcrawl/model": "workspace:*",
+    "@outcrawl/runtime": "workspace:*",
+    "@outcrawl/scout-cdp": "workspace:*",
+    "@outcrawl/scout-core": "workspace:*",
+    "agenthands": "workspace:*"
+  }
+}

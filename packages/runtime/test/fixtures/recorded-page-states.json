@@ -1,0 +1,1294 @@
+{
+ "source": "bench run 20260908122325 with OUTCRAWL_TREE_LOG=/tmp/tree-budget.jsonl",
+ "runId": "20260908122325",
+ "tree": "f299a925cac9c66e01204b5a1a4181a47d46cddf",
+ "config": "baseline / scout-1 / 60 steps / headful / settle on",
+ "hashedBy": "hashSnapshot from @outcrawl/runtime/snapshot over the FILTERED tree, exactly as the loop hashes it",
+ "snapshots": 282,
+ "runs": [
+  {
+   "task": "wv-allrecipes-10",
+   "capSteps": 60,
+   "steps": 60,
+   "outcome": "capped",
+   "stopReason": "max-steps",
+   "pass": false,
+   "usd": "0.03330968",
+   "inputTokens": 378864,
+   "outputTokens": 101856,
+   "page": [
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:33510b705e50b741ea49bf9e8691775a35b2ed99cb685488ef44c516eda13078"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:67167af1fd0bdc93face248e13157adb1c8e06e55909cb9a9e0648dfc3eab559"
+    },
+    {
+     "url": "https://www.allrecipes.com/search?q=Most+Popular+Recipes+of+the+1960s",
+     "hash": "ax1:5fad6f3d8d7c5f348caa1f8dae0423377e672962f8f16fb88f59c587ad7f44ad"
+    },
+    {
+     "url": "https://www.allrecipes.com/search?q=Most+Popular+Recipes+of+the+1960s",
+     "hash": "ax1:5fad6f3d8d7c5f348caa1f8dae0423377e672962f8f16fb88f59c587ad7f44ad"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    },
+    {
+     "url": "https://www.allrecipes.com/gallery/most-popular-recipes-1960s/",
+     "hash": "ax1:1557e214d143f3612b9e72b6d3b4fc10e328fceddfb47d130cd0515083712b30"
+    }
+   ]
+  },
+  {
+   "task": "wv-allrecipes-17",
+   "capSteps": 60,
+   "steps": 7,
+   "outcome": "wrong-answer",
+   "stopReason": "task-complete",
+   "pass": false,
+   "usd": "0.00440983",
+   "inputTokens": 51202,
+   "outputTokens": 15745,
+   "page": [
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:60de3862b15748bfa2ef268dcd79f64585e3dfb4f77fe9895d42ed94e25525bf"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:47209a9fccc91487f8da298893385b7a32a494069adc5d582b884a3e04a29afc"
+    },
+    {
+     "url": "https://www.allrecipes.com/search?q=Easy+Vegetarian+Spinach+Lasagna",
+     "hash": "ax1:6a90e06fca0539ba83b7d1cde017c9f7e5544724811f3b8ec2d9517053715f0f"
+    },
+    {
+     "url": "https://www.allrecipes.com/search?q=Easy+Vegetarian+Spinach+Lasagna",
+     "hash": "ax1:6a90e06fca0539ba83b7d1cde017c9f7e5544724811f3b8ec2d9517053715f0f"
+    },
+    {
+     "url": "https://www.allrecipes.com/recipe/229764/easy-vegetarian-spinach-lasagna/",
+     "hash": "ax1:1b07ea40cefe877ecb8102172e65d16cdaf26b254a611c78df4857b5836dac4e"
+    },
+    {
+     "url": "https://www.allrecipes.com/recipe/229764/easy-vegetarian-spinach-lasagna/",
+     "hash": "ax1:5ebb6baf0902183f560341050a130001a62547899543c12fff796b8fc441cf12"
+    },
+    {
+     "url": "https://www.allrecipes.com/recipe/229764/easy-vegetarian-spinach-lasagna/",
+     "hash": "ax1:5ebb6baf0902183f560341050a130001a62547899543c12fff796b8fc441cf12"
+    }
+   ]
+  },
+  {
+   "task": "wv-allrecipes-3",
+   "capSteps": 60,
+   "steps": 14,
+   "outcome": "pass",
+   "stopReason": "task-complete",
+   "pass": true,
+   "usd": "0.00840246",
+   "inputTokens": 85794,
+   "outputTokens": 33138,
+   "page": [
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:356f274a9f476661e9cd0222a182938cf403f729ee86e1df341bcec2adaab8c7"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:b54aeed68f5ea1ae149c75f63a54bdbf9cbb1cbfa1fa4f63c064c496e005028b"
+    },
+    {
+     "url": "https://www.allrecipes.com/search?q=vegan+chocolate+chip+cookies",
+     "hash": "ax1:dce8a5c60816e34c40ac5d076756d6e3a883d6ec5373dd489fbf56d1120baa1c"
+    },
+    {
+     "url": "https://www.allrecipes.com/search?q=vegan+chocolate+chip+cookies",
+     "hash": "ax1:dce8a5c60816e34c40ac5d076756d6e3a883d6ec5373dd489fbf56d1120baa1c"
+    },
+    {
+     "url": "https://www.allrecipes.com/search?q=vegan+chocolate+chip+cookies",
+     "hash": "ax1:dce8a5c60816e34c40ac5d076756d6e3a883d6ec5373dd489fbf56d1120baa1c"
+    },
+    {
+     "url": "https://www.allrecipes.com/search?q=vegan+chocolate+chip+cookies",
+     "hash": "ax1:dce8a5c60816e34c40ac5d076756d6e3a883d6ec5373dd489fbf56d1120baa1c"
+    },
+    {
+     "url": "https://www.allrecipes.com/search?q=vegan+chocolate+chip+cookies",
+     "hash": "ax1:dce8a5c60816e34c40ac5d076756d6e3a883d6ec5373dd489fbf56d1120baa1c"
+    },
+    {
+     "url": "https://www.allrecipes.com/search?q=vegan+chocolate+chip+cookies",
+     "hash": "ax1:dce8a5c60816e34c40ac5d076756d6e3a883d6ec5373dd489fbf56d1120baa1c"
+    },
+    {
+     "url": "https://www.allrecipes.com/search?q=vegan+chocolate+chip+cookies",
+     "hash": "ax1:dce8a5c60816e34c40ac5d076756d6e3a883d6ec5373dd489fbf56d1120baa1c"
+    },
+    {
+     "url": "https://www.allrecipes.com/search?q=vegan+chocolate+chip+cookies",
+     "hash": "ax1:247ee92c84597e0d7d6441bce2a079a751fd8d05b48cf9a5e14eacd5f8147782"
+    },
+    {
+     "url": "https://www.allrecipes.com/search?q=vegan+chocolate+chip+cookies",
+     "hash": "ax1:247ee92c84597e0d7d6441bce2a079a751fd8d05b48cf9a5e14eacd5f8147782"
+    },
+    {
+     "url": "https://www.allrecipes.com/recipe/240591/vegan-chocolate-chip-oatmeal-and-nut-cookies/",
+     "hash": "ax1:fb6147ac687ad03cae20b83f003a7b526a2b3350afaa22b183d30d93f1ec4af4"
+    },
+    {
+     "url": "https://www.allrecipes.com/recipe/240591/vegan-chocolate-chip-oatmeal-and-nut-cookies/",
+     "hash": "ax1:9b5e9344ded320d385447189bdcc4ce3ccda3fad19e9cb96633a59e741fddf33"
+    },
+    {
+     "url": "https://www.allrecipes.com/recipe/240591/vegan-chocolate-chip-oatmeal-and-nut-cookies/",
+     "hash": "ax1:ed71b4b7eccbebba6db66f445dca46f60a87cd0e840de756e8594a3e1a709840"
+    }
+   ]
+  },
+  {
+   "task": "wv-allrecipes-40",
+   "capSteps": 60,
+   "steps": 21,
+   "outcome": "wrong-answer",
+   "stopReason": "schema-satisfied",
+   "pass": false,
+   "usd": "0.01190679",
+   "inputTokens": 135884,
+   "outputTokens": 36820,
+   "page": [
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:2290f1dd7d194a46fdebe2a52a2690768c329c28e9fb9ae4be634b5aa59a76e1"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:19dd883bf6f9c684919829dd84b1da1333898319460514afa2ec6a5f426518a3"
+    },
+    {
+     "url": "https://www.allrecipes.com/about-us-6648102",
+     "hash": "ax1:40f5eed88ab42402641356f9d4338e1d2c301b0c9a2f99de72a908d7fff72b88"
+    },
+    {
+     "url": "https://www.allrecipes.com/about-us-6648102",
+     "hash": "ax1:4d3413c20b4457f9ded40572178feed4f36bceefe5a1d7160a69847f29f2dc86"
+    }
+   ]
+  },
+  {
+   "task": "wv-amazon-16",
+   "capSteps": 60,
+   "steps": 60,
+   "outcome": "capped",
+   "stopReason": "max-steps",
+   "pass": false,
+   "usd": "0.03292765",
+   "inputTokens": 383365,
+   "outputTokens": 113471,
+   "page": [
+    {
+     "url": "https://www.amazon.com/",
+     "hash": "ax1:15cb69e186c7315b9984e69da5db8325fa74eaef8f794ce53c679b088db630c0"
+    },
+    {
+     "url": "https://www.amazon.com/",
+     "hash": "ax1:6fadb24cf5355f25d183186352fadc8b1a8b8f00c3ba467be5ab37ccfe38c49d"
+    },
+    {
+     "url": "https://www.amazon.com/",
+     "hash": "ax1:7fa284a45555094cb48b85ea7ec6e6231d6f76f4715a44fd9fe969c4c2eab2f7"
+    },
+    {
+     "url": "https://www.amazon.com/s/ref=nb_sb_noss_1?url=search-alias%3Daps&field-keywords=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241",
+     "hash": "ax1:a6df6c04d2dd2bca7ecb1ade719daf99090e806bebf4708ccc3f237e0806b977"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    },
+    {
+     "url": "https://www.amazon.com/s?k=Mens+Rhinestone+Skull+Graphic+Shirt+Black+XX-Large&crid=R84J9P3ZIXYB&sprefix=mens+rhinestone+skull+graphic+shirt+black+xx-large%2Caps%2C241&ref=nb_sb_noss_1",
+     "hash": "ax1:87ddbd28a9cf7fb9bfba232e111fe13385c7a9c70f5935ffd1f6f36fdfe133a0"
+    }
+   ]
+  },
+  {
+   "task": "wv-apple-12",
+   "capSteps": 60,
+   "steps": 12,
+   "outcome": "wrong-answer",
+   "stopReason": "schema-satisfied",
+   "pass": false,
+   "usd": "0.00642848",
+   "inputTokens": 36889,
+   "outputTokens": 19130,
+   "page": [
+    {
+     "url": "https://www.apple.com/",
+     "hash": "ax1:98181bc1e7e594630a89bbfb35214c49dccf77751f28410f9d4466abc0600623"
+    },
+    {
+     "url": "https://support.apple.com/?cid=gn-ols-home-hp-tab",
+     "hash": "ax1:62559b437543f681ca770a947543d0c7ceb4f30cd70f1db4e653877774d35fe3"
+    },
+    {
+     "url": "https://support.apple.com/?cid=gn-ols-home-hp-tab",
+     "hash": "ax1:11c9e44a85bceb3f62c47298cfee510b130cf16682381ad7ce9a0c0254b6c7c0"
+    },
+    {
+     "url": "https://support.apple.com/?cid=gn-ols-home-hp-tab",
+     "hash": "ax1:11c9e44a85bceb3f62c47298cfee510b130cf16682381ad7ce9a0c0254b6c7c0"
+    },
+    {
+     "url": "https://support.apple.com/?cid=gn-ols-home-hp-tab",
+     "hash": "ax1:11c9e44a85bceb3f62c47298cfee510b130cf16682381ad7ce9a0c0254b6c7c0"
+    },
+    {
+     "url": "https://support.apple.com/?cid=gn-ols-home-hp-tab",
+     "hash": "ax1:11c9e44a85bceb3f62c47298cfee510b130cf16682381ad7ce9a0c0254b6c7c0"
+    },
+    {
+     "url": "https://support.apple.com/?cid=gn-ols-home-hp-tab",
+     "hash": "ax1:11c9e44a85bceb3f62c47298cfee510b130cf16682381ad7ce9a0c0254b6c7c0"
+    },
+    {
+     "url": "https://support.apple.com/?cid=gn-ols-home-hp-tab",
+     "hash": "ax1:11c9e44a85bceb3f62c47298cfee510b130cf16682381ad7ce9a0c0254b6c7c0"
+    },
+    {
+     "url": "https://www.apple.com/",
+     "hash": "ax1:98181bc1e7e594630a89bbfb35214c49dccf77751f28410f9d4466abc0600623"
+    },
+    {
+     "url": "https://support.apple.com/?cid=gn-ols-home-hp-tab",
+     "hash": "ax1:11c9e44a85bceb3f62c47298cfee510b130cf16682381ad7ce9a0c0254b6c7c0"
+    },
+    {
+     "url": "https://support.apple.com/?cid=gn-ols-home-hp-tab",
+     "hash": "ax1:11c9e44a85bceb3f62c47298cfee510b130cf16682381ad7ce9a0c0254b6c7c0"
+    },
+    {
+     "url": "https://support.apple.com/?cid=gn-ols-home-hp-tab",
+     "hash": "ax1:11c9e44a85bceb3f62c47298cfee510b130cf16682381ad7ce9a0c0254b6c7c0"
+    }
+   ]
+  },
+  {
+   "task": "wv-apple-17",
+   "capSteps": 60,
+   "steps": 20,
+   "outcome": "wrong-answer",
+   "stopReason": "task-complete",
+   "pass": false,
+   "usd": "0.01009539",
+   "inputTokens": 71707,
+   "outputTokens": 40634,
+   "page": [
+    {
+     "url": "https://www.apple.com/",
+     "hash": "ax1:98181bc1e7e594630a89bbfb35214c49dccf77751f28410f9d4466abc0600623"
+    },
+    {
+     "url": "https://www.apple.com/",
+     "hash": "ax1:98181bc1e7e594630a89bbfb35214c49dccf77751f28410f9d4466abc0600623"
+    },
+    {
+     "url": "https://www.apple.com/",
+     "hash": "ax1:a34f8f3606b988f606f43f5378446fc15624ff5699d516340c816e8e439a9e8d"
+    },
+    {
+     "url": "https://www.apple.com/",
+     "hash": "ax1:4a3d9b9483d8bbe3fbdd944b89a138b934cc97fdda892c7e4d2202a3f2847f90"
+    },
+    {
+     "url": "https://www.apple.com/us/search/Smart-Folio-for-iPad?src=globalnav",
+     "hash": "ax1:26568cca063891f0f7fb99f4bac2cd56ed450a37ae0e9ea6c0551d523285b2fe"
+    },
+    {
+     "url": "https://www.apple.com/us/search/Smart-Folio-for-iPad?src=globalnav",
+     "hash": "ax1:2a6e1694f2896a8b46f40d5b5500d7177120bacbffe6065d5086a89e0084c9d6"
+    },
+    {
+     "url": "https://www.apple.com/shop/product/mdeq4zm/a/smart-folio-for-ipad-a16-sky?fnode=14332fbc541ba9fe10ab4f6c414e17a22c1cb48a0d2259d6868570bbe393a504445c794c8fbfacd68a00b50f2ed4c3fa2014207cc88ffa94b1778c51d4356f36ee72d3e52ce64c3ce807637d6d4366319d0a6db15247af86286b7c51db6e971f",
+     "hash": "ax1:0089ca61cc36c630d26925d6ae2d935af8df795f0f991af6e3e798bb131dadec"
+    },
+    {
+     "url": "https://www.apple.com/shop/product/mdeq4zm/a/smart-folio-for-ipad-a16-sky?fnode=14332fbc541ba9fe10ab4f6c414e17a22c1cb48a0d2259d6868570bbe393a504445c794c8fbfacd68a00b50f2ed4c3fa2014207cc88ffa94b1778c51d4356f36ee72d3e52ce64c3ce807637d6d4366319d0a6db15247af86286b7c51db6e971f",
+     "hash": "ax1:706bace61ba555052fe6803ab7848ccff2e63c9513f4027866d7c724d435068a"
+    },
+    {
+     "url": "https://www.apple.com/shop/product/mdeq4zm/a/smart-folio-for-ipad-a16-sky?fnode=14332fbc541ba9fe10ab4f6c414e17a22c1cb48a0d2259d6868570bbe393a504445c794c8fbfacd68a00b50f2ed4c3fa2014207cc88ffa94b1778c51d4356f36ee72d3e52ce64c3ce807637d6d4366319d0a6db15247af86286b7c51db6e971f",
+     "hash": "ax1:b1ffba1b0dd3b672a6a3246b26dd9d90e7bfa6f6829ab8fb9c04a2745e62b24b"
+    },
+    {
+     "url": "https://www.apple.com/shop/product/mdeq4zm/a/smart-folio-for-ipad-a16-sky?fnode=14332fbc541ba9fe10ab4f6c414e17a22c1cb48a0d2259d6868570bbe393a504445c794c8fbfacd68a00b50f2ed4c3fa2014207cc88ffa94b1778c51d4356f36ee72d3e52ce64c3ce807637d6d4366319d0a6db15247af86286b7c51db6e971f",
+     "hash": "ax1:48eeab84d3d7687163cfad083740a065c6dabdca562ffe31b17b9e3289c22bd7"
+    },
+    {
+     "url": "https://www.apple.com/shop/product/mdeq4zm/a/smart-folio-for-ipad-a16-sky?fnode=14332fbc541ba9fe10ab4f6c414e17a22c1cb48a0d2259d6868570bbe393a504445c794c8fbfacd68a00b50f2ed4c3fa2014207cc88ffa94b1778c51d4356f36ee72d3e52ce64c3ce807637d6d4366319d0a6db15247af86286b7c51db6e971f",
+     "hash": "ax1:ba10c8c9c72de992aed0b38cf35d2ff219eeebd21bf2c4a74f9201c957d3ebb9"
+    },
+    {
+     "url": "https://www.apple.com/shop/product/mdeq4zm/a/smart-folio-for-ipad-a16-sky?fnode=14332fbc541ba9fe10ab4f6c414e17a22c1cb48a0d2259d6868570bbe393a504445c794c8fbfacd68a00b50f2ed4c3fa2014207cc88ffa94b1778c51d4356f36ee72d3e52ce64c3ce807637d6d4366319d0a6db15247af86286b7c51db6e971f",
+     "hash": "ax1:042fdd3a55161b6d68224a8a62fa59426291d7441a59994cc188b893b4e30e0b"
+    },
+    {
+     "url": "https://www.apple.com/shop/product/mdeq4zm/a/smart-folio-for-ipad-a16-sky?fnode=14332fbc541ba9fe10ab4f6c414e17a22c1cb48a0d2259d6868570bbe393a504445c794c8fbfacd68a00b50f2ed4c3fa2014207cc88ffa94b1778c51d4356f36ee72d3e52ce64c3ce807637d6d4366319d0a6db15247af86286b7c51db6e971f",
+     "hash": "ax1:81b62eb017fccbe9736e814f1a13396a4690f1c05b165b16efc05e5ff5b43691"
+    },
+    {
+     "url": "https://www.apple.com/shop/product/mdeq4zm/a/smart-folio-for-ipad-a16-sky?fnode=14332fbc541ba9fe10ab4f6c414e17a22c1cb48a0d2259d6868570bbe393a504445c794c8fbfacd68a00b50f2ed4c3fa2014207cc88ffa94b1778c51d4356f36ee72d3e52ce64c3ce807637d6d4366319d0a6db15247af86286b7c51db6e971f",
+     "hash": "ax1:8ee78668cc28851ee697259252c0b1200f6674b332685dbf31886822992c9d82"
+    },
+    {
+     "url": "https://www.apple.com/shop/product/mdeq4zm/a/smart-folio-for-ipad-a16-sky?fnode=14332fbc541ba9fe10ab4f6c414e17a22c1cb48a0d2259d6868570bbe393a504445c794c8fbfacd68a00b50f2ed4c3fa2014207cc88ffa94b1778c51d4356f36ee72d3e52ce64c3ce807637d6d4366319d0a6db15247af86286b7c51db6e971f",
+     "hash": "ax1:48eeab84d3d7687163cfad083740a065c6dabdca562ffe31b17b9e3289c22bd7"
+    },
+    {
+     "url": "https://www.apple.com/shop/product/mdeq4zm/a/smart-folio-for-ipad-a16-sky?fnode=14332fbc541ba9fe10ab4f6c414e17a22c1cb48a0d2259d6868570bbe393a504445c794c8fbfacd68a00b50f2ed4c3fa2014207cc88ffa94b1778c51d4356f36ee72d3e52ce64c3ce807637d6d4366319d0a6db15247af86286b7c51db6e971f",
+     "hash": "ax1:ba10c8c9c72de992aed0b38cf35d2ff219eeebd21bf2c4a74f9201c957d3ebb9"
+    },
+    {
+     "url": "https://www.apple.com/shop/product/mdeq4zm/a/smart-folio-for-ipad-a16-sky?fnode=14332fbc541ba9fe10ab4f6c414e17a22c1cb48a0d2259d6868570bbe393a504445c794c8fbfacd68a00b50f2ed4c3fa2014207cc88ffa94b1778c51d4356f36ee72d3e52ce64c3ce807637d6d4366319d0a6db15247af86286b7c51db6e971f",
+     "hash": "ax1:042fdd3a55161b6d68224a8a62fa59426291d7441a59994cc188b893b4e30e0b"
+    },
+    {
+     "url": "https://www.apple.com/shop/product/mdeq4zm/a/smart-folio-for-ipad-a16-sky?fnode=14332fbc541ba9fe10ab4f6c414e17a22c1cb48a0d2259d6868570bbe393a504445c794c8fbfacd68a00b50f2ed4c3fa2014207cc88ffa94b1778c51d4356f36ee72d3e52ce64c3ce807637d6d4366319d0a6db15247af86286b7c51db6e971f",
+     "hash": "ax1:8ee78668cc28851ee697259252c0b1200f6674b332685dbf31886822992c9d82"
+    },
+    {
+     "url": "https://www.apple.com/shop/product/mdeq4zm/a/smart-folio-for-ipad-a16-sky?fnode=14332fbc541ba9fe10ab4f6c414e17a22c1cb48a0d2259d6868570bbe393a504445c794c8fbfacd68a00b50f2ed4c3fa2014207cc88ffa94b1778c51d4356f36ee72d3e52ce64c3ce807637d6d4366319d0a6db15247af86286b7c51db6e971f",
+     "hash": "ax1:5a2a1bc3942ab0a95149b02deea234fe3881533b75d007d9666dc2bc744775c6"
+    },
+    {
+     "url": "https://www.apple.com/shop/product/mdeq4zm/a/smart-folio-for-ipad-a16-sky?fnode=14332fbc541ba9fe10ab4f6c414e17a22c1cb48a0d2259d6868570bbe393a504445c794c8fbfacd68a00b50f2ed4c3fa2014207cc88ffa94b1778c51d4356f36ee72d3e52ce64c3ce807637d6d4366319d0a6db15247af86286b7c51db6e971f",
+     "hash": "ax1:a382f21d7212d2600957abe1c86598c343c638c367e6a6a5b8cc9329478eba51"
+    }
+   ]
+  },
+  {
+   "task": "wv-apple-19",
+   "capSteps": 60,
+   "steps": 9,
+   "outcome": "wrong-answer",
+   "stopReason": "schema-satisfied",
+   "pass": false,
+   "usd": "0.00858459",
+   "inputTokens": 85645,
+   "outputTokens": 20134,
+   "page": [
+    {
+     "url": "https://www.apple.com/",
+     "hash": "ax1:98181bc1e7e594630a89bbfb35214c49dccf77751f28410f9d4466abc0600623"
+    },
+    {
+     "url": "https://www.apple.com/mac/",
+     "hash": "ax1:13a45d42b9540529bb8446511cdd6e23325bd4c1aae157004c69da18452ecaf7"
+    },
+    {
+     "url": "https://www.apple.com/mac/",
+     "hash": "ax1:5d7f1b2362bcc667aec6bedd33b28ae0def0ef9f50dcd6655140e0a4bda9df84"
+    },
+    {
+     "url": "https://www.apple.com/mac/",
+     "hash": "ax1:5d7f1b2362bcc667aec6bedd33b28ae0def0ef9f50dcd6655140e0a4bda9df84"
+    },
+    {
+     "url": "https://www.apple.com/mac/",
+     "hash": "ax1:5d7f1b2362bcc667aec6bedd33b28ae0def0ef9f50dcd6655140e0a4bda9df84"
+    },
+    {
+     "url": "https://www.apple.com/mac/",
+     "hash": "ax1:5d7f1b2362bcc667aec6bedd33b28ae0def0ef9f50dcd6655140e0a4bda9df84"
+    },
+    {
+     "url": "https://www.apple.com/mac/",
+     "hash": "ax1:5d7f1b2362bcc667aec6bedd33b28ae0def0ef9f50dcd6655140e0a4bda9df84"
+    },
+    {
+     "url": "https://www.apple.com/mac/",
+     "hash": "ax1:5d7f1b2362bcc667aec6bedd33b28ae0def0ef9f50dcd6655140e0a4bda9df84"
+    },
+    {
+     "url": "https://www.apple.com/mac/",
+     "hash": "ax1:5d7f1b2362bcc667aec6bedd33b28ae0def0ef9f50dcd6655140e0a4bda9df84"
+    }
+   ]
+  },
+  {
+   "task": "wv-apple-31",
+   "capSteps": 60,
+   "steps": 5,
+   "outcome": "wrong-answer",
+   "stopReason": "task-complete",
+   "pass": false,
+   "usd": "0.00360014",
+   "inputTokens": 26723,
+   "outputTokens": 8772,
+   "page": [
+    {
+     "url": "https://www.apple.com/",
+     "hash": "ax1:98181bc1e7e594630a89bbfb35214c49dccf77751f28410f9d4466abc0600623"
+    },
+    {
+     "url": "https://www.apple.com/watch/",
+     "hash": "ax1:2d64cbb4abd9978ec54aa01f0496eba0d4bff9cbf0dd28e826fc881a8c8cc82d"
+    },
+    {
+     "url": "https://www.apple.com/watch/",
+     "hash": "ax1:052ee00b6921c41d2b2171f6c324d2ad22184eb0c02658ef2d647887709699a4"
+    },
+    {
+     "url": "https://www.apple.com/watch/",
+     "hash": "ax1:052ee00b6921c41d2b2171f6c324d2ad22184eb0c02658ef2d647887709699a4"
+    },
+    {
+     "url": "https://www.apple.com/watch/",
+     "hash": "ax1:052ee00b6921c41d2b2171f6c324d2ad22184eb0c02658ef2d647887709699a4"
+    }
+   ]
+  },
+  {
+   "task": "wv-arxiv-14",
+   "capSteps": 60,
+   "steps": 60,
+   "outcome": "capped",
+   "stopReason": "max-steps",
+   "pass": false,
+   "usd": "0.02835116",
+   "inputTokens": 245336,
+   "outputTokens": 111488,
+   "page": [
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:05e53c88126c70c72fbec46768049b521e52d24b9660c089db6703a7cadaae33"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:9d06c2406ad22d6f2d972f08745f347cfcc0e5d1cd87407389a226fdce338c57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?category=all&query=SimCSE&searchtype=all&abstracts=show&start=0&size=50&from=2023-10&to=2023-10&submit=Search",
+     "hash": "ax1:5ce1cb59d560d9a16706d622eec8062216e21a1b5d6a57098ac046b05636f682"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?category=all&query=SimCSE&searchtype=all&abstracts=show&start=0&size=50&from=2023-10&to=2023-10&submit=Search",
+     "hash": "ax1:88641a074c6cf5ef818e231f7095b39341ad54cc735bf57b4f3a95b4240b6517"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?category=all&query=SimCSE&searchtype=all&abstracts=show&start=0&size=50&from=2023-10&to=2023-10&submit=Search",
+     "hash": "ax1:88641a074c6cf5ef818e231f7095b39341ad54cc735bf57b4f3a95b4240b6517"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?category=all&query=SimCSE&searchtype=all&abstracts=show&start=0&size=50&from=2023-10&to=2023-10&submit=Search",
+     "hash": "ax1:88641a074c6cf5ef818e231f7095b39341ad54cc735bf57b4f3a95b4240b6517"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?category=all&query=SimCSE&searchtype=all&abstracts=show&start=0&size=50&from=2023-10&to=2023-10&submit=Search",
+     "hash": "ax1:88641a074c6cf5ef818e231f7095b39341ad54cc735bf57b4f3a95b4240b6517"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?category=all&query=SimCSE&searchtype=all&abstracts=show&start=0&size=50&from=2023-10&to=2023-10&submit=Search",
+     "hash": "ax1:88641a074c6cf5ef818e231f7095b39341ad54cc735bf57b4f3a95b4240b6517"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?category=all&query=SimCSE&searchtype=all&abstracts=show&start=0&size=50&from=2023-10&to=2023-10&submit=Search",
+     "hash": "ax1:2ce5c0fd5ede8a26680e9e9b1787eee78c3d83bf8190944c0c7f5eba3ae17c9f"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?category=all&query=SimCSE&searchtype=all&abstracts=show&start=0&size=50&from=2023-10&to=2023-10&submit=Search",
+     "hash": "ax1:59e232dc46ddb21e5ce4e10d8e2adc856e95a27be2b6b0e97396293a189cb427"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?category=all&query=SimCSE&searchtype=all&abstracts=show&start=0&size=50&from=2023-10&to=2023-10&submit=Search",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?advanced=&terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:4545dfb62642a3bbc28bc2fe3079fdfa35f91360be153485531339f8009f6a0a"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:e29e5373fb74712f886fa59a22170cd24aaad795a89a3c5c9ee3255ab6553cfd"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    },
+    {
+     "url": "https://arxiv.org/search/advanced?terms-0-operator=AND&terms-0-term=SimCSE&terms-0-field=title&classification-physics_archives=all&classification-include_cross_list=include&date-year=&date-filter_by=date_range&date-from_date=2023-10&date-to_date=2023-10&date-date_type=announced_date_first&abstracts=show&size=50&order=-announced_date_first",
+     "hash": "ax1:1cc2dd1c8db8c4b7952bd126198f3d665feaa5b126f0d0add65e628b114a6fec"
+    }
+   ]
+  },
+  {
+   "task": "wv-arxiv-27",
+   "capSteps": 60,
+   "steps": 5,
+   "outcome": "wrong-answer",
+   "stopReason": "schema-satisfied",
+   "pass": false,
+   "usd": "0.00404021",
+   "inputTokens": 42127,
+   "outputTokens": 11496,
+   "page": [
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    }
+   ]
+  },
+  {
+   "task": "wv-arxiv-6",
+   "capSteps": 60,
+   "steps": 9,
+   "outcome": "wrong-answer",
+   "stopReason": "schema-satisfied",
+   "pass": false,
+   "usd": "0.00784602",
+   "inputTokens": 102243,
+   "outputTokens": 25042,
+   "page": [
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:05e53c88126c70c72fbec46768049b521e52d24b9660c089db6703a7cadaae33"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:ce1c1bc0b54440ac3bbc4697477f66d7a121883f69013220e2b1577bfc899366"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/search/?query=On+the+Sentence+Embeddings+from+Pre-trained+Language+Models&searchtype=all&abstracts=show",
+     "hash": "ax1:4cdfc336d1d3759753d6edacd6e48e64cd61053a114be607faab556b8675a4fb"
+    },
+    {
+     "url": "https://arxiv.org/search/?query=On+the+Sentence+Embeddings+from+Pre-trained+Language+Models&searchtype=all&abstracts=show",
+     "hash": "ax1:4cdfc336d1d3759753d6edacd6e48e64cd61053a114be607faab556b8675a4fb"
+    },
+    {
+     "url": "https://arxiv.org/search/?query=On+the+Sentence+Embeddings+from+Pre-trained+Language+Models&searchtype=all&abstracts=show",
+     "hash": "ax1:4cdfc336d1d3759753d6edacd6e48e64cd61053a114be607faab556b8675a4fb"
+    },
+    {
+     "url": "https://arxiv.org/search/?query=On+the+Sentence+Embeddings+from+Pre-trained+Language+Models&searchtype=all&abstracts=show",
+     "hash": "ax1:4cdfc336d1d3759753d6edacd6e48e64cd61053a114be607faab556b8675a4fb"
+    },
+    {
+     "url": "https://arxiv.org/abs/1908.10084",
+     "hash": "ax1:b1a9ba00a523f790aab7744ca8fb988195a1c0d5a802b3bde840d1f4e4447a0e"
+    }
+   ]
+  }
+ ]
+}

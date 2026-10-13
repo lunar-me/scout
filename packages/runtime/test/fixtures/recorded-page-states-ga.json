@@ -1,0 +1,624 @@
+{
+ "source": "bench run 20260908193404 with OUTCRAWL_TREE_LOG=/tmp/tree-wanderers.jsonl",
+ "runId": "20260908193404",
+ "tree": "e2bb26848480e5bacd42375ecbdc16effb579b44",
+ "actuator": "scout-1 / the first hands model",
+ "config": "baseline / 60 steps / 20m / bench budget 60.00 / headful / settle on",
+ "hashedBy": "hashSnapshot over the FILTERED tree, one per loopStep, keeping the LAST read of each step",
+ "note": "The first run in which NO_PROGRESS_TOLERANCE fired. wv-allrecipes-3 is absent: it died on a closed socket at step 0 and produced no reads.",
+ "snapshots": 138,
+ "runs": [
+  {
+   "task": "wv-allrecipes-40",
+   "steps": 14,
+   "capSteps": 60,
+   "outcome": "harness-error",
+   "stopReason": "error",
+   "pass": false,
+   "usd": "0.00756776",
+   "reads": 17,
+   "page": [
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:12d51b02298e4c45a9a15fef94147179bf974b32ad60598fb5775cb1ea69dec3"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:12d51b02298e4c45a9a15fef94147179bf974b32ad60598fb5775cb1ea69dec3"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:12d51b02298e4c45a9a15fef94147179bf974b32ad60598fb5775cb1ea69dec3"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:12d51b02298e4c45a9a15fef94147179bf974b32ad60598fb5775cb1ea69dec3"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:12d51b02298e4c45a9a15fef94147179bf974b32ad60598fb5775cb1ea69dec3"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:12d51b02298e4c45a9a15fef94147179bf974b32ad60598fb5775cb1ea69dec3"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:12d51b02298e4c45a9a15fef94147179bf974b32ad60598fb5775cb1ea69dec3"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:12d51b02298e4c45a9a15fef94147179bf974b32ad60598fb5775cb1ea69dec3"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:12d51b02298e4c45a9a15fef94147179bf974b32ad60598fb5775cb1ea69dec3"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:12d51b02298e4c45a9a15fef94147179bf974b32ad60598fb5775cb1ea69dec3"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:12d51b02298e4c45a9a15fef94147179bf974b32ad60598fb5775cb1ea69dec3"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:12d51b02298e4c45a9a15fef94147179bf974b32ad60598fb5775cb1ea69dec3"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:12d51b02298e4c45a9a15fef94147179bf974b32ad60598fb5775cb1ea69dec3"
+    },
+    {
+     "url": "https://www.allrecipes.com/",
+     "hash": "ax1:12d51b02298e4c45a9a15fef94147179bf974b32ad60598fb5775cb1ea69dec3"
+    }
+   ]
+  },
+  {
+   "task": "wv-arxiv-37",
+   "steps": 26,
+   "capSteps": 60,
+   "outcome": "looped",
+   "stopReason": "loop-detected",
+   "pass": false,
+   "usd": "0.01387319",
+   "reads": 29,
+   "page": [
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    },
+    {
+     "url": "https://arxiv.org/",
+     "hash": "ax1:8e03ec3504cc0a99fbb03397cd3c3a15902fe6f4870b444d0e100565ff8bbc57"
+    }
+   ]
+  },
+  {
+   "task": "wv-cambridge-dictionary-0",
+   "steps": 29,
+   "capSteps": 60,
+   "outcome": "looped",
+   "stopReason": "loop-detected",
+   "pass": false,
+   "usd": "0.01412036",
+   "reads": 43,
+   "page": [
+    {
+     "url": "https://dictionary.cambridge.org/",
+     "hash": "ax1:0a8b4c75801795561657c15428da2094a7e75ed2b42a796e88bad27272fac935"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/",
+     "hash": "ax1:74800d6ebd235058d2641d317ea7d8b0c388f459a598fe1e1bd511490ca243e8"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:e0543e90656f30b6ce9285592fa0907d06af9765da53dd033a192b0141a8fb8d"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    },
+    {
+     "url": "https://dictionary.cambridge.org/dictionary/english-turkish/sustainability",
+     "hash": "ax1:2df0d0ebdfa4157030df1bb70e9e5b92ad1bf590eea9bea227767f37c9a281ae"
+    }
+   ]
+  },
+  {
+   "task": "wv-coursera-39",
+   "steps": 35,
+   "capSteps": 60,
+   "outcome": "looped",
+   "stopReason": "loop-detected",
+   "pass": false,
+   "usd": "0.01610870",
+   "reads": 51,
+   "page": [
+    {
+     "url": "https://www.coursera.org/",
+     "hash": "ax1:8c223d34324a0a2d977e2bf1aaa51d4dde277958a361433c1dacc7b73f9334d6"
+    },
+    {
+     "url": "https://www.coursera.org/",
+     "hash": "ax1:b347b65b54cc547f4a9858d30cfe795ed54604356558bb94315b81a30ead792d"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:dd6426ca7da96bc7eca8f79da08c151796806e21281dc5dee599c97056a1a557"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:0af0ed3630f30ce6ca2b3a33332b7e207c47bf52a1f7451f599752c87f1f5260"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    },
+    {
+     "url": "https://www.coursera.org/search?query=Space%20Safety%20TUM",
+     "hash": "ax1:ed474244bc47bb67119f00b6394aafc78f09b140770ac7510798e947bdafeeb2"
+    }
+   ]
+  },
+  {
+   "task": "wv-huggingface-21",
+   "steps": 34,
+   "capSteps": 60,
+   "outcome": "looped",
+   "stopReason": "loop-detected",
+   "pass": false,
+   "usd": "0.01491071",
+   "reads": 41,
+   "page": [
+    {
+     "url": "https://huggingface.co/",
+     "hash": "ax1:9ea728bd2299b674910ac0b5bc0b5d309e19acf7bc1771d8d3faea1d76454cb4"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    },
+    {
+     "url": "https://huggingface.co/docs",
+     "hash": "ax1:8f8704a1ca1874ac1831e48d68dc0b1760fc84b01b0c01f472ca87de851e083a"
+    }
+   ]
+  }
+ ]
+}

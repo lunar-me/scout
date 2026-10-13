@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "paths": {
+      "@outcrawl/scout": ["./src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "scripts/**/*.ts"],
+  "references": [
+    { "path": "../agenthands" },
+    { "path": "../model" },
+    { "path": "../runtime" },
+    { "path": "../scout-cdp" },
+    { "path": "../scout-core" }
+  ],
+  "exclude": ["dist"]
+}

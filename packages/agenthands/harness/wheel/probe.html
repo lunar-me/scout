@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Wheel Probe</title>
+<style>
+  html, body { margin: 0; }
+  #tall { height: 400000px; background: linear-gradient(#eee, #999); }
+</style>
+</head>
+<body>
+<div id="tall">wheel probe</div>
+<script>
+(function () {
+  const W = { wheel: [], scrollend: [], scrollEvents: [], frames: [] };
+  window.__W = W;
+  window.__reset = function () {
+    W.wheel.length = 0;
+    W.scrollend.length = 0;
+    W.scrollEvents.length = 0;
+    W.frames.length = 0;
+    window.__t0 = performance.now();
+    return scrollY;
+  };
+  window.__t0 = performance.now();
+
+  // A detector chooses this: a non-passive wheel listener is ordinary and free,
+  // and it is what makes `cancelable` observable at all.
+  const passive = location.search.includes('passive=1');
+  window.__passive = passive;
+
+  addEventListener('wheel', function (e) {
+    W.wheel.push({
+      t: performance.now(),
+      ts: e.timeStamp,
+      dx: e.deltaX,
+      dy: e.deltaY,
+      dz: e.deltaZ,
+      dm: e.deltaMode,
+      wdx: e.wheelDeltaX,
+      wdy: e.wheelDeltaY,
+      cancelable: e.cancelable,
+      trusted: e.isTrusted,
+      sy: scrollY,
+      // Same-object identity check: coalescing of wheel is browser-side, so a
+      // page cannot see it directly, but it can see how many events arrive per
+      // animation frame.
+      frame: W.frames.length,
+    });
+    // NON-PASSIVE deliberately. A passive-only wheel listener makes Blink
+    // report the wheel class as passive, and the browser then sends every
+    // wheel event non-blocking, which pins `cancelable` to false regardless of
+    // phase and hides the signal being measured. preventDefault is never
+    // called, so scrolling still happens.
+  }, { capture: true, passive: passive });
+
+  addEventListener('scroll', function () {
+    W.scrollEvents.push({ t: performance.now(), sy: scrollY });
+  }, { capture: true, passive: true });
+
+  addEventListener('scrollend', function () {
+    W.scrollend.push({ t: performance.now(), sy: scrollY, w: W.wheel.length });
+  }, { capture: true, passive: true });
+
+  // Per-frame scroll position: separates a directly-applied trackpad scroll
+  // from an animated wheel-mouse scroll, which is the device tell the
+  // reconstruction in CALIBRATION.md relies on.
+  function tick() {
+    W.frames.push({ t: performance.now(), sy: scrollY, w: W.wheel.length });
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // Pointer stream, for the getCoalescedEvents question: a trackpad scroll
+  // produces no pointer events at all, so this should stay empty for every
+  // scroll method. Recorded rather than assumed.
+  W.pointer = [];
+  addEventListener('pointermove', function (e) {
+    W.pointer.push({ t: performance.now(), n: e.getCoalescedEvents().length });
+  }, { capture: true, passive: true });
+})();
+</script>
+</body>
+</html>

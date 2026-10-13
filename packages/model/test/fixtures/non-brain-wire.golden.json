@@ -1,0 +1,3226 @@
+{
+ "actuators": [
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 12000,
+   "body": {
+    "model": "hands-model",
+    "max_tokens": 4096,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You are the decision step of a browser agent. The page is frozen while you answer, so every\nnode reference in the tree you are shown is still valid when your answer arrives.\n\nAnswer with an object: {\"reasoning\": \"...\", \"actions\": [...]}.\nThe user message asks for exactly one action. Put that action first in `actions`. After it, add\nany further actions the same snapshot supports, most useful first — a caller reviewing the page\nwithout executing anything reads the whole list. If only one action makes sense, send one.\n\nONLY `actions[0]` IS PERFORMED. The rest of `actions` are alternatives — suggestions for a\nreader, never executed. If you want a second action actually carried out, it goes in `then`\n(the same tab, straight after) or in `also` (a different tab, at the same time), and only when\nthe user message offers you that field. Putting work you need done into `actions[1]` is the one\nway to have it silently not happen.\n\nThe other top-level fields are offered by the user message when they apply, and they cost you no\nextra step: `finding` for a fact you will need after this page is gone, `ruledOut` for an\napproach that did not work, `plan` and `goal` for a task with more than one outcome.\n\nA `ref` is copied verbatim from the [frameOrdinal-backendNodeId] shown beside a node. Never\ninvent one, never guess an id you were not shown, and never act on a node that is not in the\ntree: an action naming an unknown node is rejected and the step is wasted."
+     },
+     {
+      "role": "user",
+      "content": "Reply with exactly one action as JSON:\n  {\"type\":\"click\",\"ref\":\"F-N\"} or {\"type\":\"click\",\"at\":{\"x\":N,\"y\":N}} (a viewport point, e.g. from page.look)\n  {\"type\":\"fill\",\"ref\":\"F-N\",\"text\":\"...\"}\n  {\"type\":\"select\",\"ref\":\"F-N\",\"value\":\"...\"}\n  {\"type\":\"press\",\"key\":\"Enter\",\"ref\":\"F-N\"}\n  {\"type\":\"hover\",\"ref\":\"F-N\"}\n  {\"type\":\"scroll\",\"ref\":\"F-N\",\"dy\":600}\n  {\"type\":\"drag\",\"from\":\"F-N\" or {\"x\":N,\"y\":N},\"to\":\"F-N\" or {\"x\":N,\"y\":N}} (press, move with the button held, release)\n  {\"type\":\"navigate\",\"url\":\"https://...\"}\n  {\"type\":\"wait\",\"seconds\":N} (let the page run N seconds, 1-60; a longer wait is several)\n  {\"type\":\"extract\",\"instruction\":\"...\"}\n  {\"type\":\"done\",\"summary\":\"the answer, if the task asked for one\"}\n  {\"type\":\"fail\",\"reason\":\"...\"}\n  {\"type\":\"openTab\",\"url\":\"https://...\"}\n  {\"type\":\"focusTab\",\"tab\":\"t2\"}\n  {\"type\":\"closeTab\",\"tab\":\"t2\"}\nAny action may also carry \"finding\":\"a fact you will need later\" — it costs you no extra step, and it is the only record that survives this page.\nFinish on what this run has read, on pages or from tools, never on memory or a guess: before done, confirm each condition the task states. While budget remains, an unconfirmed condition means keep looking; if one cannot be confirmed, say which in your answer and list each in the done action as \"unconfirmed\":[\"...\"] (absent means every condition was confirmed).\nSub-goal rules:\n- Work the ACTIVE sub-goal only. It is the first one above that is not done or failed.\n- The moment you see a sub-goal finished, close it: \"goal\":{\"id\":\"g1\",\"status\":\"done\",\"summary\":\"what happened\"}. Do not save them all for the end.\n- \"done\" ends the WHOLE task and is REFUSED while any sub-goal is still open.\n- If a sub-goal is genuinely impossible, close it \"status\":\"failed\" with the reason and move to the next one. That is a real answer; four of five is better than none.\n- Blocked the same way twice? Add \"ruledOut\":\"what did not work\" and take a different route.\n- Do not go back to a site whose sub-goal is closed.\nTask: Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\nToday's date is 2026-10-02 (UTC). Read \"today\", \"recent\", \"last N days\", \"upcoming\" and every other date relative to now in the task against it, not against your own sense of the year.\nSchema. Record these fields with an extract action before done; the run is judged on them, not on your summary. Add \"final\":true to the extract that records your answer and the run can end on it, so nothing you planned after it happens: mark it final only as your last action, when nothing else the task asks for is left to do (a wait the task asks for is done only once Elapsed shows all of it has passed). An extract reads only the page in front of you, so mark it final on a page that states the whole answer. An extract without it is a look at the page: its result is shown to you on the next step and the run goes on.\n{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"price\":{\"type\":\"string\"}}}\nPlan:\n  g1 [active] find candidates\nFound so far. These pages are gone; this is the only record:\n  search page reached\nOpen tabs:\n  t1 [focused] \"Shop\" https://shop.example.com/search\nURL: https://shop.example.com/search\nStep 1 of 60. Credits 1.5 of 300. Elapsed 0 s of 20 min.\nPage, filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too; act on them with their references like any other line:\n0 doc \"Search\"\n1 h \"Search results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-102]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-103]\n1 inp \"Search\" [0-104]\n1 btn \"Add to cart\" [0-105]\nThe page is frozen while you think, so every reference above is still valid when you answer.\nNow reply with exactly one action as JSON, in the grammar given at the top."
+     }
+    ],
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "outcrawl_reply",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "$defs": {
+        "action": {
+         "type": "object",
+         "properties": {
+          "type": {
+           "type": "string",
+           "enum": [
+            "click",
+            "fill",
+            "select",
+            "press",
+            "hover",
+            "scroll",
+            "drag",
+            "navigate",
+            "extract",
+            "openTab",
+            "focusTab",
+            "closeTab",
+            "wait",
+            "attachFile",
+            "createFile",
+            "ask",
+            "callTool",
+            "purchase.begin",
+            "purchase.end",
+            "done",
+            "fail"
+           ]
+          },
+          "ref": {
+           "type": "string",
+           "description": "Copied verbatim from the [frame-backendNode] shown beside the node, without the brackets."
+          },
+          "text": {
+           "type": "string"
+          },
+          "value": {
+           "type": "string"
+          },
+          "key": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "dx": {
+           "type": "integer"
+          },
+          "dy": {
+           "type": "integer"
+          },
+          "seconds": {
+           "type": "integer"
+          },
+          "instruction": {
+           "type": "string"
+          },
+          "final": {
+           "type": "boolean"
+          },
+          "summary": {
+           "type": "string"
+          },
+          "unconfirmed": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "reason": {
+           "type": "string"
+          },
+          "tab": {
+           "type": "string"
+          },
+          "file": {
+           "type": "string"
+          },
+          "question": {
+           "type": "string"
+          },
+          "options": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "tool": {
+           "type": "string"
+          },
+          "arguments": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "amount": {
+           "type": "string"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "at": {
+           "type": "object",
+           "properties": {
+            "x": {
+             "type": "number"
+            },
+            "y": {
+             "type": "number"
+            }
+           },
+           "required": [
+            "x",
+            "y"
+           ],
+           "additionalProperties": false
+          },
+          "from": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          },
+          "to": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          }
+         },
+         "required": [
+          "type"
+         ],
+         "additionalProperties": false
+        }
+       },
+       "properties": {
+        "reasoning": {
+         "type": "string"
+        },
+        "actions": {
+         "type": "array",
+         "minItems": 1,
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "finding": {
+         "type": "string"
+        },
+        "ruledOut": {
+         "type": "string"
+        },
+        "goal": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "done",
+            "failed"
+           ]
+          },
+          "summary": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "status"
+         ],
+         "additionalProperties": false
+        },
+        "plan": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "goal": {
+            "type": "string"
+           },
+           "site": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "goal"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "then": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "also": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        }
+       },
+       "required": [
+        "actions"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "provider": {
+     "require_parameters": true
+    },
+    "reasoning": {
+     "enabled": false
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 12000,
+   "body": {
+    "model": "hands-model",
+    "max_tokens": 4096,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You are the decision step of a browser agent. The page is frozen while you answer, so every\nnode reference in the tree you are shown is still valid when your answer arrives.\n\nAnswer with an object: {\"reasoning\": \"...\", \"actions\": [...]}.\nThe user message asks for exactly one action. Put that action first in `actions`. After it, add\nany further actions the same snapshot supports, most useful first — a caller reviewing the page\nwithout executing anything reads the whole list. If only one action makes sense, send one.\n\nONLY `actions[0]` IS PERFORMED. The rest of `actions` are alternatives — suggestions for a\nreader, never executed. If you want a second action actually carried out, it goes in `then`\n(the same tab, straight after) or in `also` (a different tab, at the same time), and only when\nthe user message offers you that field. Putting work you need done into `actions[1]` is the one\nway to have it silently not happen.\n\nThe other top-level fields are offered by the user message when they apply, and they cost you no\nextra step: `finding` for a fact you will need after this page is gone, `ruledOut` for an\napproach that did not work, `plan` and `goal` for a task with more than one outcome.\n\nA `ref` is copied verbatim from the [frameOrdinal-backendNodeId] shown beside a node. Never\ninvent one, never guess an id you were not shown, and never act on a node that is not in the\ntree: an action naming an unknown node is rejected and the step is wasted."
+     },
+     {
+      "role": "user",
+      "content": "Reply with exactly one action as JSON:\n  {\"type\":\"click\",\"ref\":\"F-N\"} or {\"type\":\"click\",\"at\":{\"x\":N,\"y\":N}} (a viewport point, e.g. from page.look)\n  {\"type\":\"fill\",\"ref\":\"F-N\",\"text\":\"...\"}\n  {\"type\":\"select\",\"ref\":\"F-N\",\"value\":\"...\"}\n  {\"type\":\"press\",\"key\":\"Enter\",\"ref\":\"F-N\"}\n  {\"type\":\"hover\",\"ref\":\"F-N\"}\n  {\"type\":\"scroll\",\"ref\":\"F-N\",\"dy\":600}\n  {\"type\":\"drag\",\"from\":\"F-N\" or {\"x\":N,\"y\":N},\"to\":\"F-N\" or {\"x\":N,\"y\":N}} (press, move with the button held, release)\n  {\"type\":\"navigate\",\"url\":\"https://...\"}\n  {\"type\":\"wait\",\"seconds\":N} (let the page run N seconds, 1-60; a longer wait is several)\n  {\"type\":\"extract\",\"instruction\":\"...\"}\n  {\"type\":\"done\",\"summary\":\"the answer, if the task asked for one\"}\n  {\"type\":\"fail\",\"reason\":\"...\"}\n  {\"type\":\"openTab\",\"url\":\"https://...\"}\n  {\"type\":\"focusTab\",\"tab\":\"t2\"}\n  {\"type\":\"closeTab\",\"tab\":\"t2\"}\nAny action may also carry \"finding\":\"a fact you will need later\" — it costs you no extra step, and it is the only record that survives this page.\nFinish on what this run has read, on pages or from tools, never on memory or a guess: before done, confirm each condition the task states. While budget remains, an unconfirmed condition means keep looking; if one cannot be confirmed, say which in your answer and list each in the done action as \"unconfirmed\":[\"...\"] (absent means every condition was confirmed).\nSub-goal rules:\n- Work the ACTIVE sub-goal only. It is the first one above that is not done or failed.\n- The moment you see a sub-goal finished, close it: \"goal\":{\"id\":\"g1\",\"status\":\"done\",\"summary\":\"what happened\"}. Do not save them all for the end.\n- \"done\" ends the WHOLE task and is REFUSED while any sub-goal is still open.\n- If a sub-goal is genuinely impossible, close it \"status\":\"failed\" with the reason and move to the next one. That is a real answer; four of five is better than none.\n- Blocked the same way twice? Add \"ruledOut\":\"what did not work\" and take a different route.\n- Do not go back to a site whose sub-goal is closed.\nTask: Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\nToday's date is 2026-10-02 (UTC). Read \"today\", \"recent\", \"last N days\", \"upcoming\" and every other date relative to now in the task against it, not against your own sense of the year.\nSchema. Record these fields with an extract action before done; the run is judged on them, not on your summary. Add \"final\":true to the extract that records your answer and the run can end on it, so nothing you planned after it happens: mark it final only as your last action, when nothing else the task asks for is left to do (a wait the task asks for is done only once Elapsed shows all of it has passed). An extract reads only the page in front of you, so mark it final on a page that states the whole answer. An extract without it is a look at the page: its result is shown to you on the next step and the run goes on.\n{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"price\":{\"type\":\"string\"}}}\nPlan:\n  g1 [active] find candidates\nFound so far. These pages are gone; this is the only record:\n  search page reached\nAlready done:\n  0 click the node -> failed: click(0-102) failed: element is covered\nOpen tabs:\n  t1 [focused] \"Shop\" https://shop.example.com/results\nURL: https://shop.example.com/results\nStep 2 of 60. Credits 1.5 of 300. Elapsed 4 s of 20 min.\nPage, filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too; act on them with their references like any other line:\n0 doc \"Results\"\n1 h \"Results results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-202]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-203]\n1 inp \"Search\" [0-204]\n1 btn \"Add to cart\" [0-205]\nThe page is frozen while you think, so every reference above is still valid when you answer.\nNow reply with exactly one action as JSON, in the grammar given at the top."
+     }
+    ],
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "outcrawl_reply",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "$defs": {
+        "action": {
+         "type": "object",
+         "properties": {
+          "type": {
+           "type": "string",
+           "enum": [
+            "click",
+            "fill",
+            "select",
+            "press",
+            "hover",
+            "scroll",
+            "drag",
+            "navigate",
+            "extract",
+            "openTab",
+            "focusTab",
+            "closeTab",
+            "wait",
+            "attachFile",
+            "createFile",
+            "ask",
+            "callTool",
+            "purchase.begin",
+            "purchase.end",
+            "done",
+            "fail"
+           ]
+          },
+          "ref": {
+           "type": "string",
+           "description": "Copied verbatim from the [frame-backendNode] shown beside the node, without the brackets."
+          },
+          "text": {
+           "type": "string"
+          },
+          "value": {
+           "type": "string"
+          },
+          "key": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "dx": {
+           "type": "integer"
+          },
+          "dy": {
+           "type": "integer"
+          },
+          "seconds": {
+           "type": "integer"
+          },
+          "instruction": {
+           "type": "string"
+          },
+          "final": {
+           "type": "boolean"
+          },
+          "summary": {
+           "type": "string"
+          },
+          "unconfirmed": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "reason": {
+           "type": "string"
+          },
+          "tab": {
+           "type": "string"
+          },
+          "file": {
+           "type": "string"
+          },
+          "question": {
+           "type": "string"
+          },
+          "options": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "tool": {
+           "type": "string"
+          },
+          "arguments": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "amount": {
+           "type": "string"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "at": {
+           "type": "object",
+           "properties": {
+            "x": {
+             "type": "number"
+            },
+            "y": {
+             "type": "number"
+            }
+           },
+           "required": [
+            "x",
+            "y"
+           ],
+           "additionalProperties": false
+          },
+          "from": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          },
+          "to": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          }
+         },
+         "required": [
+          "type"
+         ],
+         "additionalProperties": false
+        }
+       },
+       "properties": {
+        "reasoning": {
+         "type": "string"
+        },
+        "actions": {
+         "type": "array",
+         "minItems": 1,
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "finding": {
+         "type": "string"
+        },
+        "ruledOut": {
+         "type": "string"
+        },
+        "goal": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "done",
+            "failed"
+           ]
+          },
+          "summary": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "status"
+         ],
+         "additionalProperties": false
+        },
+        "plan": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "goal": {
+            "type": "string"
+           },
+           "site": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "goal"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "then": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "also": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        }
+       },
+       "required": [
+        "actions"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "provider": {
+     "require_parameters": true
+    },
+    "reasoning": {
+     "enabled": false
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 60000,
+   "body": {
+    "model": "hands-fallback",
+    "max_tokens": 4096,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You are the decision step of a browser agent. The page is frozen while you answer, so every\nnode reference in the tree you are shown is still valid when your answer arrives.\n\nAnswer with an object: {\"reasoning\": \"...\", \"actions\": [...]}.\nThe user message asks for exactly one action. Put that action first in `actions`. After it, add\nany further actions the same snapshot supports, most useful first — a caller reviewing the page\nwithout executing anything reads the whole list. If only one action makes sense, send one.\n\nONLY `actions[0]` IS PERFORMED. The rest of `actions` are alternatives — suggestions for a\nreader, never executed. If you want a second action actually carried out, it goes in `then`\n(the same tab, straight after) or in `also` (a different tab, at the same time), and only when\nthe user message offers you that field. Putting work you need done into `actions[1]` is the one\nway to have it silently not happen.\n\nThe other top-level fields are offered by the user message when they apply, and they cost you no\nextra step: `finding` for a fact you will need after this page is gone, `ruledOut` for an\napproach that did not work, `plan` and `goal` for a task with more than one outcome.\n\nA `ref` is copied verbatim from the [frameOrdinal-backendNodeId] shown beside a node. Never\ninvent one, never guess an id you were not shown, and never act on a node that is not in the\ntree: an action naming an unknown node is rejected and the step is wasted."
+     },
+     {
+      "role": "user",
+      "content": "Reply with exactly one action as JSON:\n  {\"type\":\"click\",\"ref\":\"F-N\"} or {\"type\":\"click\",\"at\":{\"x\":N,\"y\":N}} (a viewport point, e.g. from page.look)\n  {\"type\":\"fill\",\"ref\":\"F-N\",\"text\":\"...\"}\n  {\"type\":\"select\",\"ref\":\"F-N\",\"value\":\"...\"}\n  {\"type\":\"press\",\"key\":\"Enter\",\"ref\":\"F-N\"}\n  {\"type\":\"hover\",\"ref\":\"F-N\"}\n  {\"type\":\"scroll\",\"ref\":\"F-N\",\"dy\":600}\n  {\"type\":\"drag\",\"from\":\"F-N\" or {\"x\":N,\"y\":N},\"to\":\"F-N\" or {\"x\":N,\"y\":N}} (press, move with the button held, release)\n  {\"type\":\"navigate\",\"url\":\"https://...\"}\n  {\"type\":\"wait\",\"seconds\":N} (let the page run N seconds, 1-60; a longer wait is several)\n  {\"type\":\"extract\",\"instruction\":\"...\"}\n  {\"type\":\"done\",\"summary\":\"the answer, if the task asked for one\"}\n  {\"type\":\"fail\",\"reason\":\"...\"}\n  {\"type\":\"openTab\",\"url\":\"https://...\"}\n  {\"type\":\"focusTab\",\"tab\":\"t2\"}\n  {\"type\":\"closeTab\",\"tab\":\"t2\"}\nAny action may also carry \"finding\":\"a fact you will need later\" — it costs you no extra step, and it is the only record that survives this page.\nFinish on what this run has read, on pages or from tools, never on memory or a guess: before done, confirm each condition the task states. While budget remains, an unconfirmed condition means keep looking; if one cannot be confirmed, say which in your answer and list each in the done action as \"unconfirmed\":[\"...\"] (absent means every condition was confirmed).\nSub-goal rules:\n- Work the ACTIVE sub-goal only. It is the first one above that is not done or failed.\n- The moment you see a sub-goal finished, close it: \"goal\":{\"id\":\"g1\",\"status\":\"done\",\"summary\":\"what happened\"}. Do not save them all for the end.\n- \"done\" ends the WHOLE task and is REFUSED while any sub-goal is still open.\n- If a sub-goal is genuinely impossible, close it \"status\":\"failed\" with the reason and move to the next one. That is a real answer; four of five is better than none.\n- Blocked the same way twice? Add \"ruledOut\":\"what did not work\" and take a different route.\n- Do not go back to a site whose sub-goal is closed.\nTask: Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\nToday's date is 2026-10-02 (UTC). Read \"today\", \"recent\", \"last N days\", \"upcoming\" and every other date relative to now in the task against it, not against your own sense of the year.\nSchema. Record these fields with an extract action before done; the run is judged on them, not on your summary. Add \"final\":true to the extract that records your answer and the run can end on it, so nothing you planned after it happens: mark it final only as your last action, when nothing else the task asks for is left to do (a wait the task asks for is done only once Elapsed shows all of it has passed). An extract reads only the page in front of you, so mark it final on a page that states the whole answer. An extract without it is a look at the page: its result is shown to you on the next step and the run goes on.\n{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"price\":{\"type\":\"string\"}}}\nPlan:\n  g1 [active] find candidates\nFound so far. These pages are gone; this is the only record:\n  search page reached\nAlready done:\n  0 click the node -> failed: click(0-102) failed: element is covered\nOpen tabs:\n  t1 [focused] \"Shop\" https://shop.example.com/results\nURL: https://shop.example.com/results\nStep 2 of 60. Credits 1.5 of 300. Elapsed 4 s of 20 min.\nPage, filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too; act on them with their references like any other line:\n0 doc \"Results\"\n1 h \"Results results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-202]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-203]\n1 inp \"Search\" [0-204]\n1 btn \"Add to cart\" [0-205]\nThe page is frozen while you think, so every reference above is still valid when you answer.\nNow reply with exactly one action as JSON, in the grammar given at the top."
+     }
+    ],
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "outcrawl_reply",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "$defs": {
+        "action": {
+         "type": "object",
+         "properties": {
+          "type": {
+           "type": "string",
+           "enum": [
+            "click",
+            "fill",
+            "select",
+            "press",
+            "hover",
+            "scroll",
+            "drag",
+            "navigate",
+            "extract",
+            "openTab",
+            "focusTab",
+            "closeTab",
+            "wait",
+            "attachFile",
+            "createFile",
+            "ask",
+            "callTool",
+            "purchase.begin",
+            "purchase.end",
+            "done",
+            "fail"
+           ]
+          },
+          "ref": {
+           "type": "string",
+           "description": "Copied verbatim from the [frame-backendNode] shown beside the node, without the brackets."
+          },
+          "text": {
+           "type": "string"
+          },
+          "value": {
+           "type": "string"
+          },
+          "key": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "dx": {
+           "type": "integer"
+          },
+          "dy": {
+           "type": "integer"
+          },
+          "seconds": {
+           "type": "integer"
+          },
+          "instruction": {
+           "type": "string"
+          },
+          "final": {
+           "type": "boolean"
+          },
+          "summary": {
+           "type": "string"
+          },
+          "unconfirmed": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "reason": {
+           "type": "string"
+          },
+          "tab": {
+           "type": "string"
+          },
+          "file": {
+           "type": "string"
+          },
+          "question": {
+           "type": "string"
+          },
+          "options": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "tool": {
+           "type": "string"
+          },
+          "arguments": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "amount": {
+           "type": "string"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "at": {
+           "type": "object",
+           "properties": {
+            "x": {
+             "type": "number"
+            },
+            "y": {
+             "type": "number"
+            }
+           },
+           "required": [
+            "x",
+            "y"
+           ],
+           "additionalProperties": false
+          },
+          "from": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          },
+          "to": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          }
+         },
+         "required": [
+          "type"
+         ],
+         "additionalProperties": false
+        }
+       },
+       "properties": {
+        "reasoning": {
+         "type": "string"
+        },
+        "actions": {
+         "type": "array",
+         "minItems": 1,
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "finding": {
+         "type": "string"
+        },
+        "ruledOut": {
+         "type": "string"
+        },
+        "goal": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "done",
+            "failed"
+           ]
+          },
+          "summary": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "status"
+         ],
+         "additionalProperties": false
+        },
+        "plan": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "goal": {
+            "type": "string"
+           },
+           "site": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "goal"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "then": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "also": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        }
+       },
+       "required": [
+        "actions"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "provider": {
+     "require_parameters": true
+    },
+    "reasoning": {
+     "enabled": false
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 60000,
+   "body": {
+    "model": "hands-fallback",
+    "max_tokens": 32768,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You extract structured data from one web page. The page is given to you below in whichever\nrepresentation the caller had: rendered markdown, or the filtered accessibility tree the\nbrowser reports. Read whichever you are given; do not assume the other one exists.\n\nReturn only data the page states. A field the page does not answer is omitted when the schema\nallows it and null when the schema allows null — never guessed, never inferred from the page\ntopic, and never filled with a plausible example. A wrong value is worse than a missing one:\nthe caller can see a missing field and cannot see a fabricated one."
+     },
+     {
+      "role": "user",
+      "content": "What to extract: name and price of every laptop listed\n\nPage: https://shop.example.com/results\n\nPage, as the filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. When this extraction asked where things go, a line for an element that links somewhere ends `->` and the quoted absolute URL it goes to; a line without one has no destination that was read, so never make one up. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too:\n\n0 doc \"Results\"\n1 h \"Results results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-202]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-203]\n1 inp \"Search\" [0-204]\n1 btn \"Add to cart\" [0-205]"
+     }
+    ],
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "outcrawl_reply",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "items": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       },
+       "additionalProperties": false
+      }
+     }
+    },
+    "provider": {
+     "require_parameters": true
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 60000,
+   "body": {
+    "model": "hands-fallback",
+    "max_tokens": 4096,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You are the decision step of a browser agent. The page is frozen while you answer, so every\nnode reference in the tree you are shown is still valid when your answer arrives.\n\nAnswer with an object: {\"reasoning\": \"...\", \"actions\": [...]}.\nThe user message asks for exactly one action. Put that action first in `actions`. After it, add\nany further actions the same snapshot supports, most useful first — a caller reviewing the page\nwithout executing anything reads the whole list. If only one action makes sense, send one.\n\nONLY `actions[0]` IS PERFORMED. The rest of `actions` are alternatives — suggestions for a\nreader, never executed. If you want a second action actually carried out, it goes in `then`\n(the same tab, straight after) or in `also` (a different tab, at the same time), and only when\nthe user message offers you that field. Putting work you need done into `actions[1]` is the one\nway to have it silently not happen.\n\nThe other top-level fields are offered by the user message when they apply, and they cost you no\nextra step: `finding` for a fact you will need after this page is gone, `ruledOut` for an\napproach that did not work, `plan` and `goal` for a task with more than one outcome.\n\nA `ref` is copied verbatim from the [frameOrdinal-backendNodeId] shown beside a node. Never\ninvent one, never guess an id you were not shown, and never act on a node that is not in the\ntree: an action naming an unknown node is rejected and the step is wasted."
+     },
+     {
+      "role": "user",
+      "content": "Reply with exactly one action as JSON:\n  {\"type\":\"click\",\"ref\":\"F-N\"} or {\"type\":\"click\",\"at\":{\"x\":N,\"y\":N}} (a viewport point, e.g. from page.look)\n  {\"type\":\"fill\",\"ref\":\"F-N\",\"text\":\"...\"}\n  {\"type\":\"select\",\"ref\":\"F-N\",\"value\":\"...\"}\n  {\"type\":\"press\",\"key\":\"Enter\",\"ref\":\"F-N\"}\n  {\"type\":\"hover\",\"ref\":\"F-N\"}\n  {\"type\":\"scroll\",\"ref\":\"F-N\",\"dy\":600}\n  {\"type\":\"drag\",\"from\":\"F-N\" or {\"x\":N,\"y\":N},\"to\":\"F-N\" or {\"x\":N,\"y\":N}} (press, move with the button held, release)\n  {\"type\":\"navigate\",\"url\":\"https://...\"}\n  {\"type\":\"wait\",\"seconds\":N} (let the page run N seconds, 1-60; a longer wait is several)\n  {\"type\":\"extract\",\"instruction\":\"...\"}\n  {\"type\":\"done\",\"summary\":\"the answer, if the task asked for one\"}\n  {\"type\":\"fail\",\"reason\":\"...\"}\n  {\"type\":\"openTab\",\"url\":\"https://...\"}\n  {\"type\":\"focusTab\",\"tab\":\"t2\"}\n  {\"type\":\"closeTab\",\"tab\":\"t2\"}\nAny action may also carry \"finding\":\"a fact you will need later\" — it costs you no extra step, and it is the only record that survives this page.\nFinish on what this run has read, on pages or from tools, never on memory or a guess: before done, confirm each condition the task states. While budget remains, an unconfirmed condition means keep looking; if one cannot be confirmed, say which in your answer and list each in the done action as \"unconfirmed\":[\"...\"] (absent means every condition was confirmed).\nSub-goal rules:\n- Work the ACTIVE sub-goal only. It is the first one above that is not done or failed.\n- The moment you see a sub-goal finished, close it: \"goal\":{\"id\":\"g1\",\"status\":\"done\",\"summary\":\"what happened\"}. Do not save them all for the end.\n- \"done\" ends the WHOLE task and is REFUSED while any sub-goal is still open.\n- If a sub-goal is genuinely impossible, close it \"status\":\"failed\" with the reason and move to the next one. That is a real answer; four of five is better than none.\n- Blocked the same way twice? Add \"ruledOut\":\"what did not work\" and take a different route.\n- Do not go back to a site whose sub-goal is closed.\nTask: Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\nToday's date is 2026-10-02 (UTC). Read \"today\", \"recent\", \"last N days\", \"upcoming\" and every other date relative to now in the task against it, not against your own sense of the year.\nSchema. Record these fields with an extract action before done; the run is judged on them, not on your summary. Add \"final\":true to the extract that records your answer and the run can end on it, so nothing you planned after it happens: mark it final only as your last action, when nothing else the task asks for is left to do (a wait the task asks for is done only once Elapsed shows all of it has passed). An extract reads only the page in front of you, so mark it final on a page that states the whole answer. An extract without it is a look at the page: its result is shown to you on the next step and the run goes on.\n{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"price\":{\"type\":\"string\"}}}\nPlan:\n  g1 [active] find candidates\nFound so far. These pages are gone; this is the only record:\n  search page reached\nAlready done:\n  0 click the node -> failed: click(0-102) failed: element is covered\n  1 click the node -> ok\nOpen tabs:\n  t1 [focused] \"Shop\" https://shop.example.com/product\nURL: https://shop.example.com/product\nStep 3 of 60. Credits 1.5 of 300. Elapsed 8 s of 20 min.\nPage, filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too; act on them with their references like any other line:\n0 doc \"Product\"\n1 h \"Product results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-302]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-303]\n1 inp \"Search\" [0-304]\n1 btn \"Add to cart\" [0-305]\nThe page is frozen while you think, so every reference above is still valid when you answer.\nNow reply with exactly one action as JSON, in the grammar given at the top."
+     }
+    ],
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "outcrawl_reply",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "$defs": {
+        "action": {
+         "type": "object",
+         "properties": {
+          "type": {
+           "type": "string",
+           "enum": [
+            "click",
+            "fill",
+            "select",
+            "press",
+            "hover",
+            "scroll",
+            "drag",
+            "navigate",
+            "extract",
+            "openTab",
+            "focusTab",
+            "closeTab",
+            "wait",
+            "attachFile",
+            "createFile",
+            "ask",
+            "callTool",
+            "purchase.begin",
+            "purchase.end",
+            "done",
+            "fail"
+           ]
+          },
+          "ref": {
+           "type": "string",
+           "description": "Copied verbatim from the [frame-backendNode] shown beside the node, without the brackets."
+          },
+          "text": {
+           "type": "string"
+          },
+          "value": {
+           "type": "string"
+          },
+          "key": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "dx": {
+           "type": "integer"
+          },
+          "dy": {
+           "type": "integer"
+          },
+          "seconds": {
+           "type": "integer"
+          },
+          "instruction": {
+           "type": "string"
+          },
+          "final": {
+           "type": "boolean"
+          },
+          "summary": {
+           "type": "string"
+          },
+          "unconfirmed": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "reason": {
+           "type": "string"
+          },
+          "tab": {
+           "type": "string"
+          },
+          "file": {
+           "type": "string"
+          },
+          "question": {
+           "type": "string"
+          },
+          "options": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "tool": {
+           "type": "string"
+          },
+          "arguments": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "amount": {
+           "type": "string"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "at": {
+           "type": "object",
+           "properties": {
+            "x": {
+             "type": "number"
+            },
+            "y": {
+             "type": "number"
+            }
+           },
+           "required": [
+            "x",
+            "y"
+           ],
+           "additionalProperties": false
+          },
+          "from": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          },
+          "to": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          }
+         },
+         "required": [
+          "type"
+         ],
+         "additionalProperties": false
+        }
+       },
+       "properties": {
+        "reasoning": {
+         "type": "string"
+        },
+        "actions": {
+         "type": "array",
+         "minItems": 1,
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "finding": {
+         "type": "string"
+        },
+        "ruledOut": {
+         "type": "string"
+        },
+        "goal": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "done",
+            "failed"
+           ]
+          },
+          "summary": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "status"
+         ],
+         "additionalProperties": false
+        },
+        "plan": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "goal": {
+            "type": "string"
+           },
+           "site": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "goal"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "then": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "also": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        }
+       },
+       "required": [
+        "actions"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "provider": {
+     "require_parameters": true
+    },
+    "reasoning": {
+     "enabled": false
+    }
+   }
+  }
+ ],
+ "trouble-planner": [
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 12000,
+   "body": {
+    "model": "hands-model",
+    "max_tokens": 4096,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You are the decision step of a browser agent. The page is frozen while you answer, so every\nnode reference in the tree you are shown is still valid when your answer arrives.\n\nAnswer with an object: {\"reasoning\": \"...\", \"actions\": [...]}.\nThe user message asks for exactly one action. Put that action first in `actions`. After it, add\nany further actions the same snapshot supports, most useful first — a caller reviewing the page\nwithout executing anything reads the whole list. If only one action makes sense, send one.\n\nONLY `actions[0]` IS PERFORMED. The rest of `actions` are alternatives — suggestions for a\nreader, never executed. If you want a second action actually carried out, it goes in `then`\n(the same tab, straight after) or in `also` (a different tab, at the same time), and only when\nthe user message offers you that field. Putting work you need done into `actions[1]` is the one\nway to have it silently not happen.\n\nThe other top-level fields are offered by the user message when they apply, and they cost you no\nextra step: `finding` for a fact you will need after this page is gone, `ruledOut` for an\napproach that did not work, `plan` and `goal` for a task with more than one outcome.\n\nA `ref` is copied verbatim from the [frameOrdinal-backendNodeId] shown beside a node. Never\ninvent one, never guess an id you were not shown, and never act on a node that is not in the\ntree: an action naming an unknown node is rejected and the step is wasted."
+     },
+     {
+      "role": "user",
+      "content": "Reply with exactly one action as JSON:\n  {\"type\":\"click\",\"ref\":\"F-N\"} or {\"type\":\"click\",\"at\":{\"x\":N,\"y\":N}} (a viewport point, e.g. from page.look)\n  {\"type\":\"fill\",\"ref\":\"F-N\",\"text\":\"...\"}\n  {\"type\":\"select\",\"ref\":\"F-N\",\"value\":\"...\"}\n  {\"type\":\"press\",\"key\":\"Enter\",\"ref\":\"F-N\"}\n  {\"type\":\"hover\",\"ref\":\"F-N\"}\n  {\"type\":\"scroll\",\"ref\":\"F-N\",\"dy\":600}\n  {\"type\":\"drag\",\"from\":\"F-N\" or {\"x\":N,\"y\":N},\"to\":\"F-N\" or {\"x\":N,\"y\":N}} (press, move with the button held, release)\n  {\"type\":\"navigate\",\"url\":\"https://...\"}\n  {\"type\":\"wait\",\"seconds\":N} (let the page run N seconds, 1-60; a longer wait is several)\n  {\"type\":\"extract\",\"instruction\":\"...\"}\n  {\"type\":\"done\",\"summary\":\"the answer, if the task asked for one\"}\n  {\"type\":\"fail\",\"reason\":\"...\"}\n  {\"type\":\"openTab\",\"url\":\"https://...\"}\n  {\"type\":\"focusTab\",\"tab\":\"t2\"}\n  {\"type\":\"closeTab\",\"tab\":\"t2\"}\nAny action may also carry \"finding\":\"a fact you will need later\" — it costs you no extra step, and it is the only record that survives this page.\nFinish on what this run has read, on pages or from tools, never on memory or a guess: before done, confirm each condition the task states. While budget remains, an unconfirmed condition means keep looking; if one cannot be confirmed, say which in your answer and list each in the done action as \"unconfirmed\":[\"...\"] (absent means every condition was confirmed).\nSub-goal rules:\n- Work the ACTIVE sub-goal only. It is the first one above that is not done or failed.\n- The moment you see a sub-goal finished, close it: \"goal\":{\"id\":\"g1\",\"status\":\"done\",\"summary\":\"what happened\"}. Do not save them all for the end.\n- \"done\" ends the WHOLE task and is REFUSED while any sub-goal is still open.\n- If a sub-goal is genuinely impossible, close it \"status\":\"failed\" with the reason and move to the next one. That is a real answer; four of five is better than none.\n- Blocked the same way twice? Add \"ruledOut\":\"what did not work\" and take a different route.\n- Do not go back to a site whose sub-goal is closed.\nTask: Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\nToday's date is 2026-10-02 (UTC). Read \"today\", \"recent\", \"last N days\", \"upcoming\" and every other date relative to now in the task against it, not against your own sense of the year.\nSchema. Record these fields with an extract action before done; the run is judged on them, not on your summary. Add \"final\":true to the extract that records your answer and the run can end on it, so nothing you planned after it happens: mark it final only as your last action, when nothing else the task asks for is left to do (a wait the task asks for is done only once Elapsed shows all of it has passed). An extract reads only the page in front of you, so mark it final on a page that states the whole answer. An extract without it is a look at the page: its result is shown to you on the next step and the run goes on.\n{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"price\":{\"type\":\"string\"}}}\nPlan:\n  g1 [active] find candidates\nFound so far. These pages are gone; this is the only record:\n  search page reached\nOpen tabs:\n  t1 [focused] \"Shop\" https://shop.example.com/search\nURL: https://shop.example.com/search\nStep 1 of 60. Credits 1.5 of 300. Elapsed 0 s of 20 min.\nPage, filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too; act on them with their references like any other line:\n0 doc \"Search\"\n1 h \"Search results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-102]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-103]\n1 inp \"Search\" [0-104]\n1 btn \"Add to cart\" [0-105]\nThe page is frozen while you think, so every reference above is still valid when you answer.\nNow reply with exactly one action as JSON, in the grammar given at the top."
+     }
+    ],
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "outcrawl_reply",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "$defs": {
+        "action": {
+         "type": "object",
+         "properties": {
+          "type": {
+           "type": "string",
+           "enum": [
+            "click",
+            "fill",
+            "select",
+            "press",
+            "hover",
+            "scroll",
+            "drag",
+            "navigate",
+            "extract",
+            "openTab",
+            "focusTab",
+            "closeTab",
+            "wait",
+            "attachFile",
+            "createFile",
+            "ask",
+            "callTool",
+            "purchase.begin",
+            "purchase.end",
+            "done",
+            "fail"
+           ]
+          },
+          "ref": {
+           "type": "string",
+           "description": "Copied verbatim from the [frame-backendNode] shown beside the node, without the brackets."
+          },
+          "text": {
+           "type": "string"
+          },
+          "value": {
+           "type": "string"
+          },
+          "key": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "dx": {
+           "type": "integer"
+          },
+          "dy": {
+           "type": "integer"
+          },
+          "seconds": {
+           "type": "integer"
+          },
+          "instruction": {
+           "type": "string"
+          },
+          "final": {
+           "type": "boolean"
+          },
+          "summary": {
+           "type": "string"
+          },
+          "unconfirmed": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "reason": {
+           "type": "string"
+          },
+          "tab": {
+           "type": "string"
+          },
+          "file": {
+           "type": "string"
+          },
+          "question": {
+           "type": "string"
+          },
+          "options": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "tool": {
+           "type": "string"
+          },
+          "arguments": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "amount": {
+           "type": "string"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "at": {
+           "type": "object",
+           "properties": {
+            "x": {
+             "type": "number"
+            },
+            "y": {
+             "type": "number"
+            }
+           },
+           "required": [
+            "x",
+            "y"
+           ],
+           "additionalProperties": false
+          },
+          "from": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          },
+          "to": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          }
+         },
+         "required": [
+          "type"
+         ],
+         "additionalProperties": false
+        }
+       },
+       "properties": {
+        "reasoning": {
+         "type": "string"
+        },
+        "actions": {
+         "type": "array",
+         "minItems": 1,
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "finding": {
+         "type": "string"
+        },
+        "ruledOut": {
+         "type": "string"
+        },
+        "goal": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "done",
+            "failed"
+           ]
+          },
+          "summary": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "status"
+         ],
+         "additionalProperties": false
+        },
+        "plan": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "goal": {
+            "type": "string"
+           },
+           "site": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "goal"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "then": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "also": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        }
+       },
+       "required": [
+        "actions"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "provider": {
+     "require_parameters": true
+    },
+    "reasoning": {
+     "enabled": false
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 60000,
+   "body": {
+    "model": "planner-model",
+    "max_tokens": 32768,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You extract structured data from one web page. The page is given to you below in whichever\nrepresentation the caller had: rendered markdown, or the filtered accessibility tree the\nbrowser reports. Read whichever you are given; do not assume the other one exists.\n\nReturn only data the page states. A field the page does not answer is omitted when the schema\nallows it and null when the schema allows null — never guessed, never inferred from the page\ntopic, and never filled with a plausible example. A wrong value is worse than a missing one:\nthe caller can see a missing field and cannot see a fabricated one.\n\nYour reply MUST be a single JSON object, nothing else (no prose, no code fence), validating against this JSON Schema exactly — including which object each property belongs to; do not move a property to a different object than the schema places it in:\n{\"type\":\"object\",\"properties\":{\"strategy\":{\"type\":\"string\"},\"next\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"avoid\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"required\":[\"strategy\",\"next\"],\"additionalProperties\":false}"
+     },
+     {
+      "role": "user",
+      "content": "What to extract: You are the planner for a browser agent. You are NOT looking at the page: you see the task, where the run is, what it has learned, and what it has already tried. Another model does the clicking and it does see the page. Decide the strategy for the next few steps. `strategy` is one or two sentences of direction. `next` is the ordered sub-goals to pursue now. `avoid` is anything already ruled out or looping. Be brief: every word here is re-read by the model that acts.\n\nPage, as markdown:\n\n{\n \"task\": \"Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\",\n \"step\": 1,\n \"location\": [\n  {\n   \"url\": \"https://shop.example.com/results\",\n   \"title\": \"Shop\"\n  }\n ],\n \"actionableNodes\": 4,\n \"goals\": [\n  {\n   \"goal\": \"find candidates\",\n   \"status\": \"active\"\n  }\n ],\n \"findings\": [\n  \"search page reached\"\n ],\n \"ruledOut\": [],\n \"recent\": [\n  {\n   \"step\": 0,\n   \"action\": \"click\",\n   \"failed\": true\n  }\n ],\n \"caps\": {\n  \"limits\": {\n   \"budget\": \"300\",\n   \"steps\": 60,\n   \"duration\": \"20m\"\n  },\n  \"used\": {\n   \"credits\": \"1.5\",\n   \"steps\": 1,\n   \"elapsedMs\": 4000\n  }\n }\n}"
+     }
+    ],
+    "response_format": {
+     "type": "json_object"
+    },
+    "provider": {
+     "require_parameters": true
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 12000,
+   "body": {
+    "model": "hands-model",
+    "max_tokens": 4096,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You are the decision step of a browser agent. The page is frozen while you answer, so every\nnode reference in the tree you are shown is still valid when your answer arrives.\n\nAnswer with an object: {\"reasoning\": \"...\", \"actions\": [...]}.\nThe user message asks for exactly one action. Put that action first in `actions`. After it, add\nany further actions the same snapshot supports, most useful first — a caller reviewing the page\nwithout executing anything reads the whole list. If only one action makes sense, send one.\n\nONLY `actions[0]` IS PERFORMED. The rest of `actions` are alternatives — suggestions for a\nreader, never executed. If you want a second action actually carried out, it goes in `then`\n(the same tab, straight after) or in `also` (a different tab, at the same time), and only when\nthe user message offers you that field. Putting work you need done into `actions[1]` is the one\nway to have it silently not happen.\n\nThe other top-level fields are offered by the user message when they apply, and they cost you no\nextra step: `finding` for a fact you will need after this page is gone, `ruledOut` for an\napproach that did not work, `plan` and `goal` for a task with more than one outcome.\n\nA `ref` is copied verbatim from the [frameOrdinal-backendNodeId] shown beside a node. Never\ninvent one, never guess an id you were not shown, and never act on a node that is not in the\ntree: an action naming an unknown node is rejected and the step is wasted."
+     },
+     {
+      "role": "user",
+      "content": "## Plan (revised at step 1)\nsort by price\nNext:\n- sort\n\nReply with exactly one action as JSON:\n  {\"type\":\"click\",\"ref\":\"F-N\"} or {\"type\":\"click\",\"at\":{\"x\":N,\"y\":N}} (a viewport point, e.g. from page.look)\n  {\"type\":\"fill\",\"ref\":\"F-N\",\"text\":\"...\"}\n  {\"type\":\"select\",\"ref\":\"F-N\",\"value\":\"...\"}\n  {\"type\":\"press\",\"key\":\"Enter\",\"ref\":\"F-N\"}\n  {\"type\":\"hover\",\"ref\":\"F-N\"}\n  {\"type\":\"scroll\",\"ref\":\"F-N\",\"dy\":600}\n  {\"type\":\"drag\",\"from\":\"F-N\" or {\"x\":N,\"y\":N},\"to\":\"F-N\" or {\"x\":N,\"y\":N}} (press, move with the button held, release)\n  {\"type\":\"navigate\",\"url\":\"https://...\"}\n  {\"type\":\"wait\",\"seconds\":N} (let the page run N seconds, 1-60; a longer wait is several)\n  {\"type\":\"extract\",\"instruction\":\"...\"}\n  {\"type\":\"done\",\"summary\":\"the answer, if the task asked for one\"}\n  {\"type\":\"fail\",\"reason\":\"...\"}\n  {\"type\":\"openTab\",\"url\":\"https://...\"}\n  {\"type\":\"focusTab\",\"tab\":\"t2\"}\n  {\"type\":\"closeTab\",\"tab\":\"t2\"}\nAny action may also carry \"finding\":\"a fact you will need later\" — it costs you no extra step, and it is the only record that survives this page.\nFinish on what this run has read, on pages or from tools, never on memory or a guess: before done, confirm each condition the task states. While budget remains, an unconfirmed condition means keep looking; if one cannot be confirmed, say which in your answer and list each in the done action as \"unconfirmed\":[\"...\"] (absent means every condition was confirmed).\nSub-goal rules:\n- Work the ACTIVE sub-goal only. It is the first one above that is not done or failed.\n- The moment you see a sub-goal finished, close it: \"goal\":{\"id\":\"g1\",\"status\":\"done\",\"summary\":\"what happened\"}. Do not save them all for the end.\n- \"done\" ends the WHOLE task and is REFUSED while any sub-goal is still open.\n- If a sub-goal is genuinely impossible, close it \"status\":\"failed\" with the reason and move to the next one. That is a real answer; four of five is better than none.\n- Blocked the same way twice? Add \"ruledOut\":\"what did not work\" and take a different route.\n- Do not go back to a site whose sub-goal is closed.\nTask: Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\nToday's date is 2026-10-02 (UTC). Read \"today\", \"recent\", \"last N days\", \"upcoming\" and every other date relative to now in the task against it, not against your own sense of the year.\nSchema. Record these fields with an extract action before done; the run is judged on them, not on your summary. Add \"final\":true to the extract that records your answer and the run can end on it, so nothing you planned after it happens: mark it final only as your last action, when nothing else the task asks for is left to do (a wait the task asks for is done only once Elapsed shows all of it has passed). An extract reads only the page in front of you, so mark it final on a page that states the whole answer. An extract without it is a look at the page: its result is shown to you on the next step and the run goes on.\n{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"price\":{\"type\":\"string\"}}}\nPlan:\n  g1 [active] find candidates\nFound so far. These pages are gone; this is the only record:\n  search page reached\nAlready done:\n  0 click the node -> failed: click(0-102) failed: element is covered\nOpen tabs:\n  t1 [focused] \"Shop\" https://shop.example.com/results\nURL: https://shop.example.com/results\nStep 2 of 60. Credits 1.5 of 300. Elapsed 4 s of 20 min.\nPage, filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too; act on them with their references like any other line:\n0 doc \"Results\"\n1 h \"Results results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-202]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-203]\n1 inp \"Search\" [0-204]\n1 btn \"Add to cart\" [0-205]\nThe page is frozen while you think, so every reference above is still valid when you answer.\nNow reply with exactly one action as JSON, in the grammar given at the top."
+     }
+    ],
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "outcrawl_reply",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "$defs": {
+        "action": {
+         "type": "object",
+         "properties": {
+          "type": {
+           "type": "string",
+           "enum": [
+            "click",
+            "fill",
+            "select",
+            "press",
+            "hover",
+            "scroll",
+            "drag",
+            "navigate",
+            "extract",
+            "openTab",
+            "focusTab",
+            "closeTab",
+            "wait",
+            "attachFile",
+            "createFile",
+            "ask",
+            "callTool",
+            "purchase.begin",
+            "purchase.end",
+            "done",
+            "fail"
+           ]
+          },
+          "ref": {
+           "type": "string",
+           "description": "Copied verbatim from the [frame-backendNode] shown beside the node, without the brackets."
+          },
+          "text": {
+           "type": "string"
+          },
+          "value": {
+           "type": "string"
+          },
+          "key": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "dx": {
+           "type": "integer"
+          },
+          "dy": {
+           "type": "integer"
+          },
+          "seconds": {
+           "type": "integer"
+          },
+          "instruction": {
+           "type": "string"
+          },
+          "final": {
+           "type": "boolean"
+          },
+          "summary": {
+           "type": "string"
+          },
+          "unconfirmed": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "reason": {
+           "type": "string"
+          },
+          "tab": {
+           "type": "string"
+          },
+          "file": {
+           "type": "string"
+          },
+          "question": {
+           "type": "string"
+          },
+          "options": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "tool": {
+           "type": "string"
+          },
+          "arguments": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "amount": {
+           "type": "string"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "at": {
+           "type": "object",
+           "properties": {
+            "x": {
+             "type": "number"
+            },
+            "y": {
+             "type": "number"
+            }
+           },
+           "required": [
+            "x",
+            "y"
+           ],
+           "additionalProperties": false
+          },
+          "from": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          },
+          "to": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          }
+         },
+         "required": [
+          "type"
+         ],
+         "additionalProperties": false
+        }
+       },
+       "properties": {
+        "reasoning": {
+         "type": "string"
+        },
+        "actions": {
+         "type": "array",
+         "minItems": 1,
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "finding": {
+         "type": "string"
+        },
+        "ruledOut": {
+         "type": "string"
+        },
+        "goal": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "done",
+            "failed"
+           ]
+          },
+          "summary": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "status"
+         ],
+         "additionalProperties": false
+        },
+        "plan": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "goal": {
+            "type": "string"
+           },
+           "site": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "goal"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "then": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "also": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        }
+       },
+       "required": [
+        "actions"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "provider": {
+     "require_parameters": true
+    },
+    "reasoning": {
+     "enabled": false
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 60000,
+   "body": {
+    "model": "hands-model",
+    "max_tokens": 32768,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You extract structured data from one web page. The page is given to you below in whichever\nrepresentation the caller had: rendered markdown, or the filtered accessibility tree the\nbrowser reports. Read whichever you are given; do not assume the other one exists.\n\nReturn only data the page states. A field the page does not answer is omitted when the schema\nallows it and null when the schema allows null — never guessed, never inferred from the page\ntopic, and never filled with a plausible example. A wrong value is worse than a missing one:\nthe caller can see a missing field and cannot see a fabricated one."
+     },
+     {
+      "role": "user",
+      "content": "What to extract: name and price of every laptop listed\n\nPage: https://shop.example.com/results\n\nPage, as the filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. When this extraction asked where things go, a line for an element that links somewhere ends `->` and the quoted absolute URL it goes to; a line without one has no destination that was read, so never make one up. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too:\n\n0 doc \"Results\"\n1 h \"Results results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-202]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-203]\n1 inp \"Search\" [0-204]\n1 btn \"Add to cart\" [0-205]"
+     }
+    ],
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "outcrawl_reply",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "items": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       },
+       "additionalProperties": false
+      }
+     }
+    },
+    "provider": {
+     "require_parameters": true
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 12000,
+   "body": {
+    "model": "hands-model",
+    "max_tokens": 4096,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You are the decision step of a browser agent. The page is frozen while you answer, so every\nnode reference in the tree you are shown is still valid when your answer arrives.\n\nAnswer with an object: {\"reasoning\": \"...\", \"actions\": [...]}.\nThe user message asks for exactly one action. Put that action first in `actions`. After it, add\nany further actions the same snapshot supports, most useful first — a caller reviewing the page\nwithout executing anything reads the whole list. If only one action makes sense, send one.\n\nONLY `actions[0]` IS PERFORMED. The rest of `actions` are alternatives — suggestions for a\nreader, never executed. If you want a second action actually carried out, it goes in `then`\n(the same tab, straight after) or in `also` (a different tab, at the same time), and only when\nthe user message offers you that field. Putting work you need done into `actions[1]` is the one\nway to have it silently not happen.\n\nThe other top-level fields are offered by the user message when they apply, and they cost you no\nextra step: `finding` for a fact you will need after this page is gone, `ruledOut` for an\napproach that did not work, `plan` and `goal` for a task with more than one outcome.\n\nA `ref` is copied verbatim from the [frameOrdinal-backendNodeId] shown beside a node. Never\ninvent one, never guess an id you were not shown, and never act on a node that is not in the\ntree: an action naming an unknown node is rejected and the step is wasted."
+     },
+     {
+      "role": "user",
+      "content": "## Plan (revised at step 1)\nsort by price\nNext:\n- sort\n\nReply with exactly one action as JSON:\n  {\"type\":\"click\",\"ref\":\"F-N\"} or {\"type\":\"click\",\"at\":{\"x\":N,\"y\":N}} (a viewport point, e.g. from page.look)\n  {\"type\":\"fill\",\"ref\":\"F-N\",\"text\":\"...\"}\n  {\"type\":\"select\",\"ref\":\"F-N\",\"value\":\"...\"}\n  {\"type\":\"press\",\"key\":\"Enter\",\"ref\":\"F-N\"}\n  {\"type\":\"hover\",\"ref\":\"F-N\"}\n  {\"type\":\"scroll\",\"ref\":\"F-N\",\"dy\":600}\n  {\"type\":\"drag\",\"from\":\"F-N\" or {\"x\":N,\"y\":N},\"to\":\"F-N\" or {\"x\":N,\"y\":N}} (press, move with the button held, release)\n  {\"type\":\"navigate\",\"url\":\"https://...\"}\n  {\"type\":\"wait\",\"seconds\":N} (let the page run N seconds, 1-60; a longer wait is several)\n  {\"type\":\"extract\",\"instruction\":\"...\"}\n  {\"type\":\"done\",\"summary\":\"the answer, if the task asked for one\"}\n  {\"type\":\"fail\",\"reason\":\"...\"}\n  {\"type\":\"openTab\",\"url\":\"https://...\"}\n  {\"type\":\"focusTab\",\"tab\":\"t2\"}\n  {\"type\":\"closeTab\",\"tab\":\"t2\"}\nAny action may also carry \"finding\":\"a fact you will need later\" — it costs you no extra step, and it is the only record that survives this page.\nFinish on what this run has read, on pages or from tools, never on memory or a guess: before done, confirm each condition the task states. While budget remains, an unconfirmed condition means keep looking; if one cannot be confirmed, say which in your answer and list each in the done action as \"unconfirmed\":[\"...\"] (absent means every condition was confirmed).\nSub-goal rules:\n- Work the ACTIVE sub-goal only. It is the first one above that is not done or failed.\n- The moment you see a sub-goal finished, close it: \"goal\":{\"id\":\"g1\",\"status\":\"done\",\"summary\":\"what happened\"}. Do not save them all for the end.\n- \"done\" ends the WHOLE task and is REFUSED while any sub-goal is still open.\n- If a sub-goal is genuinely impossible, close it \"status\":\"failed\" with the reason and move to the next one. That is a real answer; four of five is better than none.\n- Blocked the same way twice? Add \"ruledOut\":\"what did not work\" and take a different route.\n- Do not go back to a site whose sub-goal is closed.\nTask: Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\nToday's date is 2026-10-02 (UTC). Read \"today\", \"recent\", \"last N days\", \"upcoming\" and every other date relative to now in the task against it, not against your own sense of the year.\nSchema. Record these fields with an extract action before done; the run is judged on them, not on your summary. Add \"final\":true to the extract that records your answer and the run can end on it, so nothing you planned after it happens: mark it final only as your last action, when nothing else the task asks for is left to do (a wait the task asks for is done only once Elapsed shows all of it has passed). An extract reads only the page in front of you, so mark it final on a page that states the whole answer. An extract without it is a look at the page: its result is shown to you on the next step and the run goes on.\n{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"price\":{\"type\":\"string\"}}}\nPlan:\n  g1 [active] find candidates\nFound so far. These pages are gone; this is the only record:\n  search page reached\nAlready done:\n  0 click the node -> failed: click(0-102) failed: element is covered\n  1 click the node -> ok\nOpen tabs:\n  t1 [focused] \"Shop\" https://shop.example.com/product\nURL: https://shop.example.com/product\nStep 3 of 60. Credits 1.5 of 300. Elapsed 8 s of 20 min.\nPage, filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too; act on them with their references like any other line:\n0 doc \"Product\"\n1 h \"Product results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-302]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-303]\n1 inp \"Search\" [0-304]\n1 btn \"Add to cart\" [0-305]\nThe page is frozen while you think, so every reference above is still valid when you answer.\nNow reply with exactly one action as JSON, in the grammar given at the top."
+     }
+    ],
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "outcrawl_reply",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "$defs": {
+        "action": {
+         "type": "object",
+         "properties": {
+          "type": {
+           "type": "string",
+           "enum": [
+            "click",
+            "fill",
+            "select",
+            "press",
+            "hover",
+            "scroll",
+            "drag",
+            "navigate",
+            "extract",
+            "openTab",
+            "focusTab",
+            "closeTab",
+            "wait",
+            "attachFile",
+            "createFile",
+            "ask",
+            "callTool",
+            "purchase.begin",
+            "purchase.end",
+            "done",
+            "fail"
+           ]
+          },
+          "ref": {
+           "type": "string",
+           "description": "Copied verbatim from the [frame-backendNode] shown beside the node, without the brackets."
+          },
+          "text": {
+           "type": "string"
+          },
+          "value": {
+           "type": "string"
+          },
+          "key": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "dx": {
+           "type": "integer"
+          },
+          "dy": {
+           "type": "integer"
+          },
+          "seconds": {
+           "type": "integer"
+          },
+          "instruction": {
+           "type": "string"
+          },
+          "final": {
+           "type": "boolean"
+          },
+          "summary": {
+           "type": "string"
+          },
+          "unconfirmed": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "reason": {
+           "type": "string"
+          },
+          "tab": {
+           "type": "string"
+          },
+          "file": {
+           "type": "string"
+          },
+          "question": {
+           "type": "string"
+          },
+          "options": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "tool": {
+           "type": "string"
+          },
+          "arguments": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "amount": {
+           "type": "string"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "at": {
+           "type": "object",
+           "properties": {
+            "x": {
+             "type": "number"
+            },
+            "y": {
+             "type": "number"
+            }
+           },
+           "required": [
+            "x",
+            "y"
+           ],
+           "additionalProperties": false
+          },
+          "from": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          },
+          "to": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          }
+         },
+         "required": [
+          "type"
+         ],
+         "additionalProperties": false
+        }
+       },
+       "properties": {
+        "reasoning": {
+         "type": "string"
+        },
+        "actions": {
+         "type": "array",
+         "minItems": 1,
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "finding": {
+         "type": "string"
+        },
+        "ruledOut": {
+         "type": "string"
+        },
+        "goal": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "done",
+            "failed"
+           ]
+          },
+          "summary": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "status"
+         ],
+         "additionalProperties": false
+        },
+        "plan": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "goal": {
+            "type": "string"
+           },
+           "site": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "goal"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "then": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "also": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        }
+       },
+       "required": [
+        "actions"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "provider": {
+     "require_parameters": true
+    },
+    "reasoning": {
+     "enabled": false
+    }
+   }
+  }
+ ],
+ "frontier-actor": [
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 60000,
+   "body": {
+    "model": "frontier-model",
+    "max_tokens": 4096,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You are the decision step of a browser agent. The page is frozen while you answer, so every\nnode reference in the tree you are shown is still valid when your answer arrives.\n\nAnswer with an object: {\"actions\": [...]}.\nThe user message asks for exactly one action. Put that action first in `actions`. After it, add\nany further actions the same snapshot supports, most useful first — a caller reviewing the page\nwithout executing anything reads the whole list. If only one action makes sense, send one.\n\nONLY `actions[0]` IS PERFORMED. The rest of `actions` are alternatives — suggestions for a\nreader, never executed. If you want a second action actually carried out, it goes in `then`\n(the same tab, straight after) or in `also` (a different tab, at the same time), and only when\nthe user message offers you that field. Putting work you need done into `actions[1]` is the one\nway to have it silently not happen.\n\nThe other top-level fields are offered by the user message when they apply, and they cost you no\nextra step: `finding` for a fact you will need after this page is gone, `ruledOut` for an\napproach that did not work, `plan` and `goal` for a task with more than one outcome.\n\nA `ref` is copied verbatim from the [frameOrdinal-backendNodeId] shown beside a node. Never\ninvent one, never guess an id you were not shown, and never act on a node that is not in the\ntree: an action naming an unknown node is rejected and the step is wasted.\n\nYour reply MUST be a single JSON object, nothing else (no prose, no code fence), validating against this JSON Schema exactly — including which object each property belongs to; do not move a property to a different object than the schema places it in:\n{\"type\":\"object\",\"$defs\":{\"action\":{\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"click\",\"fill\",\"select\",\"press\",\"hover\",\"scroll\",\"drag\",\"navigate\",\"extract\",\"openTab\",\"focusTab\",\"closeTab\",\"wait\",\"attachFile\",\"createFile\",\"ask\",\"callTool\",\"purchase.begin\",\"purchase.end\",\"done\",\"fail\"]},\"ref\":{\"type\":\"string\",\"description\":\"Copied verbatim from the [frame-backendNode] shown beside the node, without the brackets.\"},\"text\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"},\"key\":{\"type\":\"string\"},\"url\":{\"type\":\"string\"},\"dx\":{\"type\":\"integer\"},\"dy\":{\"type\":\"integer\"},\"seconds\":{\"type\":\"integer\"},\"instruction\":{\"type\":\"string\"},\"final\":{\"type\":\"boolean\"},\"summary\":{\"type\":\"string\"},\"unconfirmed\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"reason\":{\"type\":\"string\"},\"tab\":{\"type\":\"string\"},\"file\":{\"type\":\"string\"},\"question\":{\"type\":\"string\"},\"options\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"tool\":{\"type\":\"string\"},\"arguments\":{\"type\":\"object\",\"additionalProperties\":true},\"amount\":{\"type\":\"string\"},\"currency\":{\"type\":\"string\"},\"at\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"number\"},\"y\":{\"type\":\"number\"}},\"required\":[\"x\",\"y\"],\"additionalProperties\":false},\"from\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"number\"},\"y\":{\"type\":\"number\"}},\"required\":[\"x\",\"y\"],\"additionalProperties\":false}]},\"to\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"number\"},\"y\":{\"type\":\"number\"}},\"required\":[\"x\",\"y\"],\"additionalProperties\":false}]}},\"required\":[\"type\"],\"additionalProperties\":false}},\"properties\":{\"actions\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"$ref\":\"#/$defs/action\"}},\"finding\":{\"type\":\"string\"},\"ruledOut\":{\"type\":\"string\"},\"goal\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"status\":{\"type\":\"string\",\"enum\":[\"done\",\"failed\"]},\"summary\":{\"type\":\"string\"}},\"required\":[\"id\",\"status\"],\"additionalProperties\":false},\"plan\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"goal\":{\"type\":\"string\"},\"site\":{\"type\":\"string\"}},\"required\":[\"id\",\"goal\"],\"additionalProperties\":false}},\"then\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/action\"}},\"also\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/action\"}}},\"required\":[\"actions\"],\"additionalProperties\":false}"
+     },
+     {
+      "role": "user",
+      "content": "Reply with exactly one action as JSON:\n  {\"type\":\"click\",\"ref\":\"F-N\"} or {\"type\":\"click\",\"at\":{\"x\":N,\"y\":N}} (a viewport point, e.g. from page.look)\n  {\"type\":\"fill\",\"ref\":\"F-N\",\"text\":\"...\"}\n  {\"type\":\"select\",\"ref\":\"F-N\",\"value\":\"...\"}\n  {\"type\":\"press\",\"key\":\"Enter\",\"ref\":\"F-N\"}\n  {\"type\":\"hover\",\"ref\":\"F-N\"}\n  {\"type\":\"scroll\",\"ref\":\"F-N\",\"dy\":600}\n  {\"type\":\"drag\",\"from\":\"F-N\" or {\"x\":N,\"y\":N},\"to\":\"F-N\" or {\"x\":N,\"y\":N}} (press, move with the button held, release)\n  {\"type\":\"navigate\",\"url\":\"https://...\"}\n  {\"type\":\"wait\",\"seconds\":N} (let the page run N seconds, 1-60; a longer wait is several)\n  {\"type\":\"extract\",\"instruction\":\"...\"}\n  {\"type\":\"done\",\"summary\":\"the answer, if the task asked for one\"}\n  {\"type\":\"fail\",\"reason\":\"...\"}\n  {\"type\":\"openTab\",\"url\":\"https://...\"}\n  {\"type\":\"focusTab\",\"tab\":\"t2\"}\n  {\"type\":\"closeTab\",\"tab\":\"t2\"}\nAny action may also carry \"finding\":\"a fact you will need later\" — it costs you no extra step, and it is the only record that survives this page.\nFinish on what this run has read, on pages or from tools, never on memory or a guess: before done, confirm each condition the task states. While budget remains, an unconfirmed condition means keep looking; if one cannot be confirmed, say which in your answer and list each in the done action as \"unconfirmed\":[\"...\"] (absent means every condition was confirmed).\nSub-goal rules:\n- Work the ACTIVE sub-goal only. It is the first one above that is not done or failed.\n- The moment you see a sub-goal finished, close it: \"goal\":{\"id\":\"g1\",\"status\":\"done\",\"summary\":\"what happened\"}. Do not save them all for the end.\n- \"done\" ends the WHOLE task and is REFUSED while any sub-goal is still open.\n- If a sub-goal is genuinely impossible, close it \"status\":\"failed\" with the reason and move to the next one. That is a real answer; four of five is better than none.\n- Blocked the same way twice? Add \"ruledOut\":\"what did not work\" and take a different route.\n- Do not go back to a site whose sub-goal is closed.\nTask: Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\nToday's date is 2026-10-02 (UTC). Read \"today\", \"recent\", \"last N days\", \"upcoming\" and every other date relative to now in the task against it, not against your own sense of the year.\nSchema. Record these fields with an extract action before done; the run is judged on them, not on your summary. Add \"final\":true to the extract that records your answer and the run can end on it, so nothing you planned after it happens: mark it final only as your last action, when nothing else the task asks for is left to do (a wait the task asks for is done only once Elapsed shows all of it has passed). An extract reads only the page in front of you, so mark it final on a page that states the whole answer. An extract without it is a look at the page: its result is shown to you on the next step and the run goes on.\n{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"price\":{\"type\":\"string\"}}}\nPlan:\n  g1 [active] find candidates\nFound so far. These pages are gone; this is the only record:\n  search page reached\nOpen tabs:\n  t1 [focused] \"Shop\" https://shop.example.com/search\nURL: https://shop.example.com/search\nStep 1 of 60. Credits 1.5 of 300. Elapsed 0 s of 20 min.\nPage, filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too; act on them with their references like any other line:\n0 doc \"Search\"\n1 h \"Search results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-102]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-103]\n1 inp \"Search\" [0-104]\n1 btn \"Add to cart\" [0-105]\nThe page is frozen while you think, so every reference above is still valid when you answer.\nNow reply with exactly one action as JSON, in the grammar given at the top."
+     }
+    ],
+    "response_format": {
+     "type": "json_object"
+    },
+    "provider": {
+     "require_parameters": true
+    },
+    "reasoning": {
+     "effort": "low"
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 60000,
+   "body": {
+    "model": "frontier-model",
+    "max_tokens": 4096,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You are the decision step of a browser agent. The page is frozen while you answer, so every\nnode reference in the tree you are shown is still valid when your answer arrives.\n\nAnswer with an object: {\"actions\": [...]}.\nThe user message asks for exactly one action. Put that action first in `actions`. After it, add\nany further actions the same snapshot supports, most useful first — a caller reviewing the page\nwithout executing anything reads the whole list. If only one action makes sense, send one.\n\nONLY `actions[0]` IS PERFORMED. The rest of `actions` are alternatives — suggestions for a\nreader, never executed. If you want a second action actually carried out, it goes in `then`\n(the same tab, straight after) or in `also` (a different tab, at the same time), and only when\nthe user message offers you that field. Putting work you need done into `actions[1]` is the one\nway to have it silently not happen.\n\nThe other top-level fields are offered by the user message when they apply, and they cost you no\nextra step: `finding` for a fact you will need after this page is gone, `ruledOut` for an\napproach that did not work, `plan` and `goal` for a task with more than one outcome.\n\nA `ref` is copied verbatim from the [frameOrdinal-backendNodeId] shown beside a node. Never\ninvent one, never guess an id you were not shown, and never act on a node that is not in the\ntree: an action naming an unknown node is rejected and the step is wasted.\n\nYour reply MUST be a single JSON object, nothing else (no prose, no code fence), validating against this JSON Schema exactly — including which object each property belongs to; do not move a property to a different object than the schema places it in:\n{\"type\":\"object\",\"$defs\":{\"action\":{\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"click\",\"fill\",\"select\",\"press\",\"hover\",\"scroll\",\"drag\",\"navigate\",\"extract\",\"openTab\",\"focusTab\",\"closeTab\",\"wait\",\"attachFile\",\"createFile\",\"ask\",\"callTool\",\"purchase.begin\",\"purchase.end\",\"done\",\"fail\"]},\"ref\":{\"type\":\"string\",\"description\":\"Copied verbatim from the [frame-backendNode] shown beside the node, without the brackets.\"},\"text\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"},\"key\":{\"type\":\"string\"},\"url\":{\"type\":\"string\"},\"dx\":{\"type\":\"integer\"},\"dy\":{\"type\":\"integer\"},\"seconds\":{\"type\":\"integer\"},\"instruction\":{\"type\":\"string\"},\"final\":{\"type\":\"boolean\"},\"summary\":{\"type\":\"string\"},\"unconfirmed\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"reason\":{\"type\":\"string\"},\"tab\":{\"type\":\"string\"},\"file\":{\"type\":\"string\"},\"question\":{\"type\":\"string\"},\"options\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"tool\":{\"type\":\"string\"},\"arguments\":{\"type\":\"object\",\"additionalProperties\":true},\"amount\":{\"type\":\"string\"},\"currency\":{\"type\":\"string\"},\"at\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"number\"},\"y\":{\"type\":\"number\"}},\"required\":[\"x\",\"y\"],\"additionalProperties\":false},\"from\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"number\"},\"y\":{\"type\":\"number\"}},\"required\":[\"x\",\"y\"],\"additionalProperties\":false}]},\"to\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"number\"},\"y\":{\"type\":\"number\"}},\"required\":[\"x\",\"y\"],\"additionalProperties\":false}]}},\"required\":[\"type\"],\"additionalProperties\":false}},\"properties\":{\"actions\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"$ref\":\"#/$defs/action\"}},\"finding\":{\"type\":\"string\"},\"ruledOut\":{\"type\":\"string\"},\"goal\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"status\":{\"type\":\"string\",\"enum\":[\"done\",\"failed\"]},\"summary\":{\"type\":\"string\"}},\"required\":[\"id\",\"status\"],\"additionalProperties\":false},\"plan\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"goal\":{\"type\":\"string\"},\"site\":{\"type\":\"string\"}},\"required\":[\"id\",\"goal\"],\"additionalProperties\":false}},\"then\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/action\"}},\"also\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/action\"}}},\"required\":[\"actions\"],\"additionalProperties\":false}"
+     },
+     {
+      "role": "user",
+      "content": "Reply with exactly one action as JSON:\n  {\"type\":\"click\",\"ref\":\"F-N\"} or {\"type\":\"click\",\"at\":{\"x\":N,\"y\":N}} (a viewport point, e.g. from page.look)\n  {\"type\":\"fill\",\"ref\":\"F-N\",\"text\":\"...\"}\n  {\"type\":\"select\",\"ref\":\"F-N\",\"value\":\"...\"}\n  {\"type\":\"press\",\"key\":\"Enter\",\"ref\":\"F-N\"}\n  {\"type\":\"hover\",\"ref\":\"F-N\"}\n  {\"type\":\"scroll\",\"ref\":\"F-N\",\"dy\":600}\n  {\"type\":\"drag\",\"from\":\"F-N\" or {\"x\":N,\"y\":N},\"to\":\"F-N\" or {\"x\":N,\"y\":N}} (press, move with the button held, release)\n  {\"type\":\"navigate\",\"url\":\"https://...\"}\n  {\"type\":\"wait\",\"seconds\":N} (let the page run N seconds, 1-60; a longer wait is several)\n  {\"type\":\"extract\",\"instruction\":\"...\"}\n  {\"type\":\"done\",\"summary\":\"the answer, if the task asked for one\"}\n  {\"type\":\"fail\",\"reason\":\"...\"}\n  {\"type\":\"openTab\",\"url\":\"https://...\"}\n  {\"type\":\"focusTab\",\"tab\":\"t2\"}\n  {\"type\":\"closeTab\",\"tab\":\"t2\"}\nAny action may also carry \"finding\":\"a fact you will need later\" — it costs you no extra step, and it is the only record that survives this page.\nFinish on what this run has read, on pages or from tools, never on memory or a guess: before done, confirm each condition the task states. While budget remains, an unconfirmed condition means keep looking; if one cannot be confirmed, say which in your answer and list each in the done action as \"unconfirmed\":[\"...\"] (absent means every condition was confirmed).\nSub-goal rules:\n- Work the ACTIVE sub-goal only. It is the first one above that is not done or failed.\n- The moment you see a sub-goal finished, close it: \"goal\":{\"id\":\"g1\",\"status\":\"done\",\"summary\":\"what happened\"}. Do not save them all for the end.\n- \"done\" ends the WHOLE task and is REFUSED while any sub-goal is still open.\n- If a sub-goal is genuinely impossible, close it \"status\":\"failed\" with the reason and move to the next one. That is a real answer; four of five is better than none.\n- Blocked the same way twice? Add \"ruledOut\":\"what did not work\" and take a different route.\n- Do not go back to a site whose sub-goal is closed.\nTask: Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\nToday's date is 2026-10-02 (UTC). Read \"today\", \"recent\", \"last N days\", \"upcoming\" and every other date relative to now in the task against it, not against your own sense of the year.\nSchema. Record these fields with an extract action before done; the run is judged on them, not on your summary. Add \"final\":true to the extract that records your answer and the run can end on it, so nothing you planned after it happens: mark it final only as your last action, when nothing else the task asks for is left to do (a wait the task asks for is done only once Elapsed shows all of it has passed). An extract reads only the page in front of you, so mark it final on a page that states the whole answer. An extract without it is a look at the page: its result is shown to you on the next step and the run goes on.\n{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"price\":{\"type\":\"string\"}}}\nPlan:\n  g1 [active] find candidates\nFound so far. These pages are gone; this is the only record:\n  search page reached\nAlready done:\n  0 click the node -> failed: click(0-102) failed: element is covered\nOpen tabs:\n  t1 [focused] \"Shop\" https://shop.example.com/results\nURL: https://shop.example.com/results\nStep 2 of 60. Credits 1.5 of 300. Elapsed 4 s of 20 min.\nPage, filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too; act on them with their references like any other line:\n0 doc \"Results\"\n1 h \"Results results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-202]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-203]\n1 inp \"Search\" [0-204]\n1 btn \"Add to cart\" [0-205]\nThe page is frozen while you think, so every reference above is still valid when you answer.\nNow reply with exactly one action as JSON, in the grammar given at the top."
+     }
+    ],
+    "response_format": {
+     "type": "json_object"
+    },
+    "provider": {
+     "require_parameters": true
+    },
+    "reasoning": {
+     "effort": "low"
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 60000,
+   "body": {
+    "model": "frontier-model",
+    "max_tokens": 32768,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You extract structured data from one web page. The page is given to you below in whichever\nrepresentation the caller had: rendered markdown, or the filtered accessibility tree the\nbrowser reports. Read whichever you are given; do not assume the other one exists.\n\nReturn only data the page states. A field the page does not answer is omitted when the schema\nallows it and null when the schema allows null — never guessed, never inferred from the page\ntopic, and never filled with a plausible example. A wrong value is worse than a missing one:\nthe caller can see a missing field and cannot see a fabricated one.\n\nYour reply MUST be a single JSON object, nothing else (no prose, no code fence), validating against this JSON Schema exactly — including which object each property belongs to; do not move a property to a different object than the schema places it in:\n{\"type\":\"object\",\"properties\":{\"items\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"additionalProperties\":false}"
+     },
+     {
+      "role": "user",
+      "content": "What to extract: name and price of every laptop listed\n\nPage: https://shop.example.com/results\n\nPage, as the filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. When this extraction asked where things go, a line for an element that links somewhere ends `->` and the quoted absolute URL it goes to; a line without one has no destination that was read, so never make one up. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too:\n\n0 doc \"Results\"\n1 h \"Results results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-202]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-203]\n1 inp \"Search\" [0-204]\n1 btn \"Add to cart\" [0-205]"
+     }
+    ],
+    "response_format": {
+     "type": "json_object"
+    },
+    "provider": {
+     "require_parameters": true
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 60000,
+   "body": {
+    "model": "frontier-model",
+    "max_tokens": 4096,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You are the decision step of a browser agent. The page is frozen while you answer, so every\nnode reference in the tree you are shown is still valid when your answer arrives.\n\nAnswer with an object: {\"actions\": [...]}.\nThe user message asks for exactly one action. Put that action first in `actions`. After it, add\nany further actions the same snapshot supports, most useful first — a caller reviewing the page\nwithout executing anything reads the whole list. If only one action makes sense, send one.\n\nONLY `actions[0]` IS PERFORMED. The rest of `actions` are alternatives — suggestions for a\nreader, never executed. If you want a second action actually carried out, it goes in `then`\n(the same tab, straight after) or in `also` (a different tab, at the same time), and only when\nthe user message offers you that field. Putting work you need done into `actions[1]` is the one\nway to have it silently not happen.\n\nThe other top-level fields are offered by the user message when they apply, and they cost you no\nextra step: `finding` for a fact you will need after this page is gone, `ruledOut` for an\napproach that did not work, `plan` and `goal` for a task with more than one outcome.\n\nA `ref` is copied verbatim from the [frameOrdinal-backendNodeId] shown beside a node. Never\ninvent one, never guess an id you were not shown, and never act on a node that is not in the\ntree: an action naming an unknown node is rejected and the step is wasted.\n\nYour reply MUST be a single JSON object, nothing else (no prose, no code fence), validating against this JSON Schema exactly — including which object each property belongs to; do not move a property to a different object than the schema places it in:\n{\"type\":\"object\",\"$defs\":{\"action\":{\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"click\",\"fill\",\"select\",\"press\",\"hover\",\"scroll\",\"drag\",\"navigate\",\"extract\",\"openTab\",\"focusTab\",\"closeTab\",\"wait\",\"attachFile\",\"createFile\",\"ask\",\"callTool\",\"purchase.begin\",\"purchase.end\",\"done\",\"fail\"]},\"ref\":{\"type\":\"string\",\"description\":\"Copied verbatim from the [frame-backendNode] shown beside the node, without the brackets.\"},\"text\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"},\"key\":{\"type\":\"string\"},\"url\":{\"type\":\"string\"},\"dx\":{\"type\":\"integer\"},\"dy\":{\"type\":\"integer\"},\"seconds\":{\"type\":\"integer\"},\"instruction\":{\"type\":\"string\"},\"final\":{\"type\":\"boolean\"},\"summary\":{\"type\":\"string\"},\"unconfirmed\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"reason\":{\"type\":\"string\"},\"tab\":{\"type\":\"string\"},\"file\":{\"type\":\"string\"},\"question\":{\"type\":\"string\"},\"options\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"tool\":{\"type\":\"string\"},\"arguments\":{\"type\":\"object\",\"additionalProperties\":true},\"amount\":{\"type\":\"string\"},\"currency\":{\"type\":\"string\"},\"at\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"number\"},\"y\":{\"type\":\"number\"}},\"required\":[\"x\",\"y\"],\"additionalProperties\":false},\"from\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"number\"},\"y\":{\"type\":\"number\"}},\"required\":[\"x\",\"y\"],\"additionalProperties\":false}]},\"to\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"number\"},\"y\":{\"type\":\"number\"}},\"required\":[\"x\",\"y\"],\"additionalProperties\":false}]}},\"required\":[\"type\"],\"additionalProperties\":false}},\"properties\":{\"actions\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"$ref\":\"#/$defs/action\"}},\"finding\":{\"type\":\"string\"},\"ruledOut\":{\"type\":\"string\"},\"goal\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"status\":{\"type\":\"string\",\"enum\":[\"done\",\"failed\"]},\"summary\":{\"type\":\"string\"}},\"required\":[\"id\",\"status\"],\"additionalProperties\":false},\"plan\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"goal\":{\"type\":\"string\"},\"site\":{\"type\":\"string\"}},\"required\":[\"id\",\"goal\"],\"additionalProperties\":false}},\"then\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/action\"}},\"also\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/action\"}}},\"required\":[\"actions\"],\"additionalProperties\":false}"
+     },
+     {
+      "role": "user",
+      "content": "Reply with exactly one action as JSON:\n  {\"type\":\"click\",\"ref\":\"F-N\"} or {\"type\":\"click\",\"at\":{\"x\":N,\"y\":N}} (a viewport point, e.g. from page.look)\n  {\"type\":\"fill\",\"ref\":\"F-N\",\"text\":\"...\"}\n  {\"type\":\"select\",\"ref\":\"F-N\",\"value\":\"...\"}\n  {\"type\":\"press\",\"key\":\"Enter\",\"ref\":\"F-N\"}\n  {\"type\":\"hover\",\"ref\":\"F-N\"}\n  {\"type\":\"scroll\",\"ref\":\"F-N\",\"dy\":600}\n  {\"type\":\"drag\",\"from\":\"F-N\" or {\"x\":N,\"y\":N},\"to\":\"F-N\" or {\"x\":N,\"y\":N}} (press, move with the button held, release)\n  {\"type\":\"navigate\",\"url\":\"https://...\"}\n  {\"type\":\"wait\",\"seconds\":N} (let the page run N seconds, 1-60; a longer wait is several)\n  {\"type\":\"extract\",\"instruction\":\"...\"}\n  {\"type\":\"done\",\"summary\":\"the answer, if the task asked for one\"}\n  {\"type\":\"fail\",\"reason\":\"...\"}\n  {\"type\":\"openTab\",\"url\":\"https://...\"}\n  {\"type\":\"focusTab\",\"tab\":\"t2\"}\n  {\"type\":\"closeTab\",\"tab\":\"t2\"}\nAny action may also carry \"finding\":\"a fact you will need later\" — it costs you no extra step, and it is the only record that survives this page.\nFinish on what this run has read, on pages or from tools, never on memory or a guess: before done, confirm each condition the task states. While budget remains, an unconfirmed condition means keep looking; if one cannot be confirmed, say which in your answer and list each in the done action as \"unconfirmed\":[\"...\"] (absent means every condition was confirmed).\nSub-goal rules:\n- Work the ACTIVE sub-goal only. It is the first one above that is not done or failed.\n- The moment you see a sub-goal finished, close it: \"goal\":{\"id\":\"g1\",\"status\":\"done\",\"summary\":\"what happened\"}. Do not save them all for the end.\n- \"done\" ends the WHOLE task and is REFUSED while any sub-goal is still open.\n- If a sub-goal is genuinely impossible, close it \"status\":\"failed\" with the reason and move to the next one. That is a real answer; four of five is better than none.\n- Blocked the same way twice? Add \"ruledOut\":\"what did not work\" and take a different route.\n- Do not go back to a site whose sub-goal is closed.\nTask: Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\nToday's date is 2026-10-02 (UTC). Read \"today\", \"recent\", \"last N days\", \"upcoming\" and every other date relative to now in the task against it, not against your own sense of the year.\nSchema. Record these fields with an extract action before done; the run is judged on them, not on your summary. Add \"final\":true to the extract that records your answer and the run can end on it, so nothing you planned after it happens: mark it final only as your last action, when nothing else the task asks for is left to do (a wait the task asks for is done only once Elapsed shows all of it has passed). An extract reads only the page in front of you, so mark it final on a page that states the whole answer. An extract without it is a look at the page: its result is shown to you on the next step and the run goes on.\n{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"price\":{\"type\":\"string\"}}}\nPlan:\n  g1 [active] find candidates\nFound so far. These pages are gone; this is the only record:\n  search page reached\nAlready done:\n  0 click the node -> failed: click(0-102) failed: element is covered\n  1 click the node -> ok\nOpen tabs:\n  t1 [focused] \"Shop\" https://shop.example.com/product\nURL: https://shop.example.com/product\nStep 3 of 60. Credits 1.5 of 300. Elapsed 8 s of 20 min.\nPage, filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too; act on them with their references like any other line:\n0 doc \"Product\"\n1 h \"Product results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-302]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-303]\n1 inp \"Search\" [0-304]\n1 btn \"Add to cart\" [0-305]\nThe page is frozen while you think, so every reference above is still valid when you answer.\nNow reply with exactly one action as JSON, in the grammar given at the top."
+     }
+    ],
+    "response_format": {
+     "type": "json_object"
+    },
+    "provider": {
+     "require_parameters": true
+    },
+    "reasoning": {
+     "effort": "low"
+    }
+   }
+  }
+ ],
+ "tool-planner": [
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 12000,
+   "body": {
+    "model": "hands-model",
+    "max_tokens": 4096,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You are the decision step of a browser agent. The page is frozen while you answer, so every\nnode reference in the tree you are shown is still valid when your answer arrives.\n\nAnswer with an object: {\"reasoning\": \"...\", \"actions\": [...]}.\nThe user message asks for exactly one action. Put that action first in `actions`. After it, add\nany further actions the same snapshot supports, most useful first — a caller reviewing the page\nwithout executing anything reads the whole list. If only one action makes sense, send one.\n\nONLY `actions[0]` IS PERFORMED. The rest of `actions` are alternatives — suggestions for a\nreader, never executed. If you want a second action actually carried out, it goes in `then`\n(the same tab, straight after) or in `also` (a different tab, at the same time), and only when\nthe user message offers you that field. Putting work you need done into `actions[1]` is the one\nway to have it silently not happen.\n\nThe other top-level fields are offered by the user message when they apply, and they cost you no\nextra step: `finding` for a fact you will need after this page is gone, `ruledOut` for an\napproach that did not work, `plan` and `goal` for a task with more than one outcome.\n\nA `ref` is copied verbatim from the [frameOrdinal-backendNodeId] shown beside a node. Never\ninvent one, never guess an id you were not shown, and never act on a node that is not in the\ntree: an action naming an unknown node is rejected and the step is wasted."
+     },
+     {
+      "role": "user",
+      "content": "Reply with exactly one action as JSON:\n  {\"type\":\"click\",\"ref\":\"F-N\"} or {\"type\":\"click\",\"at\":{\"x\":N,\"y\":N}} (a viewport point, e.g. from page.look)\n  {\"type\":\"fill\",\"ref\":\"F-N\",\"text\":\"...\"}\n  {\"type\":\"select\",\"ref\":\"F-N\",\"value\":\"...\"}\n  {\"type\":\"press\",\"key\":\"Enter\",\"ref\":\"F-N\"}\n  {\"type\":\"hover\",\"ref\":\"F-N\"}\n  {\"type\":\"scroll\",\"ref\":\"F-N\",\"dy\":600}\n  {\"type\":\"drag\",\"from\":\"F-N\" or {\"x\":N,\"y\":N},\"to\":\"F-N\" or {\"x\":N,\"y\":N}} (press, move with the button held, release)\n  {\"type\":\"navigate\",\"url\":\"https://...\"}\n  {\"type\":\"wait\",\"seconds\":N} (let the page run N seconds, 1-60; a longer wait is several)\n  {\"type\":\"extract\",\"instruction\":\"...\"}\n  {\"type\":\"done\",\"summary\":\"the answer, if the task asked for one\"}\n  {\"type\":\"fail\",\"reason\":\"...\"}\n  {\"type\":\"openTab\",\"url\":\"https://...\"}\n  {\"type\":\"focusTab\",\"tab\":\"t2\"}\n  {\"type\":\"closeTab\",\"tab\":\"t2\"}\nAny action may also carry \"finding\":\"a fact you will need later\" — it costs you no extra step, and it is the only record that survives this page.\nFinish on what this run has read, on pages or from tools, never on memory or a guess: before done, confirm each condition the task states. While budget remains, an unconfirmed condition means keep looking; if one cannot be confirmed, say which in your answer and list each in the done action as \"unconfirmed\":[\"...\"] (absent means every condition was confirmed).\nSub-goal rules:\n- Work the ACTIVE sub-goal only. It is the first one above that is not done or failed.\n- The moment you see a sub-goal finished, close it: \"goal\":{\"id\":\"g1\",\"status\":\"done\",\"summary\":\"what happened\"}. Do not save them all for the end.\n- \"done\" ends the WHOLE task and is REFUSED while any sub-goal is still open.\n- If a sub-goal is genuinely impossible, close it \"status\":\"failed\" with the reason and move to the next one. That is a real answer; four of five is better than none.\n- Blocked the same way twice? Add \"ruledOut\":\"what did not work\" and take a different route.\n- Do not go back to a site whose sub-goal is closed.\nTask: Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\nToday's date is 2026-10-02 (UTC). Read \"today\", \"recent\", \"last N days\", \"upcoming\" and every other date relative to now in the task against it, not against your own sense of the year.\nSchema. Record these fields with an extract action before done; the run is judged on them, not on your summary. Add \"final\":true to the extract that records your answer and the run can end on it, so nothing you planned after it happens: mark it final only as your last action, when nothing else the task asks for is left to do (a wait the task asks for is done only once Elapsed shows all of it has passed). An extract reads only the page in front of you, so mark it final on a page that states the whole answer. An extract without it is a look at the page: its result is shown to you on the next step and the run goes on.\n{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"price\":{\"type\":\"string\"}}}\nPlan:\n  g1 [active] find candidates\nFound so far. These pages are gone; this is the only record:\n  search page reached\nOpen tabs:\n  t1 [focused] \"Shop\" https://shop.example.com/search\nURL: https://shop.example.com/search\nStep 1 of 60. Credits 1.5 of 300. Elapsed 0 s of 20 min.\nPage, filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too; act on them with their references like any other line:\n0 doc \"Search\"\n1 h \"Search results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-102]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-103]\n1 inp \"Search\" [0-104]\n1 btn \"Add to cart\" [0-105]\nThe page is frozen while you think, so every reference above is still valid when you answer.\nNow reply with exactly one action as JSON, in the grammar given at the top."
+     }
+    ],
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "outcrawl_reply",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "$defs": {
+        "action": {
+         "type": "object",
+         "properties": {
+          "type": {
+           "type": "string",
+           "enum": [
+            "click",
+            "fill",
+            "select",
+            "press",
+            "hover",
+            "scroll",
+            "drag",
+            "navigate",
+            "extract",
+            "openTab",
+            "focusTab",
+            "closeTab",
+            "wait",
+            "attachFile",
+            "createFile",
+            "ask",
+            "callTool",
+            "purchase.begin",
+            "purchase.end",
+            "done",
+            "fail"
+           ]
+          },
+          "ref": {
+           "type": "string",
+           "description": "Copied verbatim from the [frame-backendNode] shown beside the node, without the brackets."
+          },
+          "text": {
+           "type": "string"
+          },
+          "value": {
+           "type": "string"
+          },
+          "key": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "dx": {
+           "type": "integer"
+          },
+          "dy": {
+           "type": "integer"
+          },
+          "seconds": {
+           "type": "integer"
+          },
+          "instruction": {
+           "type": "string"
+          },
+          "final": {
+           "type": "boolean"
+          },
+          "summary": {
+           "type": "string"
+          },
+          "unconfirmed": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "reason": {
+           "type": "string"
+          },
+          "tab": {
+           "type": "string"
+          },
+          "file": {
+           "type": "string"
+          },
+          "question": {
+           "type": "string"
+          },
+          "options": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "tool": {
+           "type": "string"
+          },
+          "arguments": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "amount": {
+           "type": "string"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "at": {
+           "type": "object",
+           "properties": {
+            "x": {
+             "type": "number"
+            },
+            "y": {
+             "type": "number"
+            }
+           },
+           "required": [
+            "x",
+            "y"
+           ],
+           "additionalProperties": false
+          },
+          "from": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          },
+          "to": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          }
+         },
+         "required": [
+          "type"
+         ],
+         "additionalProperties": false
+        }
+       },
+       "properties": {
+        "reasoning": {
+         "type": "string"
+        },
+        "actions": {
+         "type": "array",
+         "minItems": 1,
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "finding": {
+         "type": "string"
+        },
+        "ruledOut": {
+         "type": "string"
+        },
+        "goal": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "done",
+            "failed"
+           ]
+          },
+          "summary": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "status"
+         ],
+         "additionalProperties": false
+        },
+        "plan": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "goal": {
+            "type": "string"
+           },
+           "site": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "goal"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "then": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "also": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        }
+       },
+       "required": [
+        "actions"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "provider": {
+     "require_parameters": true
+    },
+    "reasoning": {
+     "enabled": false
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 60000,
+   "body": {
+    "model": "tool-planner-model",
+    "max_tokens": 32768,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You extract structured data from one web page. The page is given to you below in whichever\nrepresentation the caller had: rendered markdown, or the filtered accessibility tree the\nbrowser reports. Read whichever you are given; do not assume the other one exists.\n\nReturn only data the page states. A field the page does not answer is omitted when the schema\nallows it and null when the schema allows null — never guessed, never inferred from the page\ntopic, and never filled with a plausible example. A wrong value is worse than a missing one:\nthe caller can see a missing field and cannot see a fabricated one."
+     },
+     {
+      "role": "user",
+      "content": "What to extract: You are the planner for a browser agent. You are NOT looking at the page: you see the task, where the run is, what it has learned, and what it has already tried. Another model does the clicking and it does see the page. Decide the strategy for the next few steps. `strategy` is one or two sentences of direction. `next` is the ordered sub-goals to pursue now. `avoid` is anything already ruled out or looping. Be brief: every word here is re-read by the model that acts.\n\nPage, as markdown:\n\n{\n \"task\": \"Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\",\n \"step\": 1,\n \"location\": [\n  {\n   \"url\": \"https://shop.example.com/results\",\n   \"title\": \"Shop\"\n  }\n ],\n \"actionableNodes\": 4,\n \"goals\": [\n  {\n   \"goal\": \"find candidates\",\n   \"status\": \"active\"\n  }\n ],\n \"findings\": [\n  \"search page reached\"\n ],\n \"ruledOut\": [],\n \"recent\": [\n  {\n   \"step\": 0,\n   \"action\": \"click\",\n   \"failed\": true\n  }\n ],\n \"caps\": {\n  \"limits\": {\n   \"budget\": \"300\",\n   \"steps\": 60,\n   \"duration\": \"20m\"\n  },\n  \"used\": {\n   \"credits\": \"1.5\",\n   \"steps\": 1,\n   \"elapsedMs\": 4000\n  }\n }\n}"
+     }
+    ],
+    "tools": [
+     {
+      "type": "function",
+      "function": {
+       "name": "outcrawl_reply",
+       "description": "Record the reply, matching the parameters schema exactly — including which object each property belongs to; do not move a property to a different object than the schema places it in.",
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "strategy": {
+          "type": "string"
+         },
+         "next": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "avoid": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        },
+        "required": [
+         "strategy",
+         "next"
+        ],
+        "additionalProperties": false
+       }
+      }
+     }
+    ],
+    "tool_choice": {
+     "type": "function",
+     "function": {
+      "name": "outcrawl_reply"
+     }
+    },
+    "provider": {
+     "require_parameters": true
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 12000,
+   "body": {
+    "model": "hands-model",
+    "max_tokens": 4096,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You are the decision step of a browser agent. The page is frozen while you answer, so every\nnode reference in the tree you are shown is still valid when your answer arrives.\n\nAnswer with an object: {\"reasoning\": \"...\", \"actions\": [...]}.\nThe user message asks for exactly one action. Put that action first in `actions`. After it, add\nany further actions the same snapshot supports, most useful first — a caller reviewing the page\nwithout executing anything reads the whole list. If only one action makes sense, send one.\n\nONLY `actions[0]` IS PERFORMED. The rest of `actions` are alternatives — suggestions for a\nreader, never executed. If you want a second action actually carried out, it goes in `then`\n(the same tab, straight after) or in `also` (a different tab, at the same time), and only when\nthe user message offers you that field. Putting work you need done into `actions[1]` is the one\nway to have it silently not happen.\n\nThe other top-level fields are offered by the user message when they apply, and they cost you no\nextra step: `finding` for a fact you will need after this page is gone, `ruledOut` for an\napproach that did not work, `plan` and `goal` for a task with more than one outcome.\n\nA `ref` is copied verbatim from the [frameOrdinal-backendNodeId] shown beside a node. Never\ninvent one, never guess an id you were not shown, and never act on a node that is not in the\ntree: an action naming an unknown node is rejected and the step is wasted."
+     },
+     {
+      "role": "user",
+      "content": "## Plan (revised at step 1)\nsort by price\nNext:\n- sort\n\nReply with exactly one action as JSON:\n  {\"type\":\"click\",\"ref\":\"F-N\"} or {\"type\":\"click\",\"at\":{\"x\":N,\"y\":N}} (a viewport point, e.g. from page.look)\n  {\"type\":\"fill\",\"ref\":\"F-N\",\"text\":\"...\"}\n  {\"type\":\"select\",\"ref\":\"F-N\",\"value\":\"...\"}\n  {\"type\":\"press\",\"key\":\"Enter\",\"ref\":\"F-N\"}\n  {\"type\":\"hover\",\"ref\":\"F-N\"}\n  {\"type\":\"scroll\",\"ref\":\"F-N\",\"dy\":600}\n  {\"type\":\"drag\",\"from\":\"F-N\" or {\"x\":N,\"y\":N},\"to\":\"F-N\" or {\"x\":N,\"y\":N}} (press, move with the button held, release)\n  {\"type\":\"navigate\",\"url\":\"https://...\"}\n  {\"type\":\"wait\",\"seconds\":N} (let the page run N seconds, 1-60; a longer wait is several)\n  {\"type\":\"extract\",\"instruction\":\"...\"}\n  {\"type\":\"done\",\"summary\":\"the answer, if the task asked for one\"}\n  {\"type\":\"fail\",\"reason\":\"...\"}\n  {\"type\":\"openTab\",\"url\":\"https://...\"}\n  {\"type\":\"focusTab\",\"tab\":\"t2\"}\n  {\"type\":\"closeTab\",\"tab\":\"t2\"}\nAny action may also carry \"finding\":\"a fact you will need later\" — it costs you no extra step, and it is the only record that survives this page.\nFinish on what this run has read, on pages or from tools, never on memory or a guess: before done, confirm each condition the task states. While budget remains, an unconfirmed condition means keep looking; if one cannot be confirmed, say which in your answer and list each in the done action as \"unconfirmed\":[\"...\"] (absent means every condition was confirmed).\nSub-goal rules:\n- Work the ACTIVE sub-goal only. It is the first one above that is not done or failed.\n- The moment you see a sub-goal finished, close it: \"goal\":{\"id\":\"g1\",\"status\":\"done\",\"summary\":\"what happened\"}. Do not save them all for the end.\n- \"done\" ends the WHOLE task and is REFUSED while any sub-goal is still open.\n- If a sub-goal is genuinely impossible, close it \"status\":\"failed\" with the reason and move to the next one. That is a real answer; four of five is better than none.\n- Blocked the same way twice? Add \"ruledOut\":\"what did not work\" and take a different route.\n- Do not go back to a site whose sub-goal is closed.\nTask: Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\nToday's date is 2026-10-02 (UTC). Read \"today\", \"recent\", \"last N days\", \"upcoming\" and every other date relative to now in the task against it, not against your own sense of the year.\nSchema. Record these fields with an extract action before done; the run is judged on them, not on your summary. Add \"final\":true to the extract that records your answer and the run can end on it, so nothing you planned after it happens: mark it final only as your last action, when nothing else the task asks for is left to do (a wait the task asks for is done only once Elapsed shows all of it has passed). An extract reads only the page in front of you, so mark it final on a page that states the whole answer. An extract without it is a look at the page: its result is shown to you on the next step and the run goes on.\n{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"price\":{\"type\":\"string\"}}}\nPlan:\n  g1 [active] find candidates\nFound so far. These pages are gone; this is the only record:\n  search page reached\nAlready done:\n  0 click the node -> failed: click(0-102) failed: element is covered\nOpen tabs:\n  t1 [focused] \"Shop\" https://shop.example.com/results\nURL: https://shop.example.com/results\nStep 2 of 60. Credits 1.5 of 300. Elapsed 4 s of 20 min.\nPage, filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too; act on them with their references like any other line:\n0 doc \"Results\"\n1 h \"Results results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-202]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-203]\n1 inp \"Search\" [0-204]\n1 btn \"Add to cart\" [0-205]\nThe page is frozen while you think, so every reference above is still valid when you answer.\nNow reply with exactly one action as JSON, in the grammar given at the top."
+     }
+    ],
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "outcrawl_reply",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "$defs": {
+        "action": {
+         "type": "object",
+         "properties": {
+          "type": {
+           "type": "string",
+           "enum": [
+            "click",
+            "fill",
+            "select",
+            "press",
+            "hover",
+            "scroll",
+            "drag",
+            "navigate",
+            "extract",
+            "openTab",
+            "focusTab",
+            "closeTab",
+            "wait",
+            "attachFile",
+            "createFile",
+            "ask",
+            "callTool",
+            "purchase.begin",
+            "purchase.end",
+            "done",
+            "fail"
+           ]
+          },
+          "ref": {
+           "type": "string",
+           "description": "Copied verbatim from the [frame-backendNode] shown beside the node, without the brackets."
+          },
+          "text": {
+           "type": "string"
+          },
+          "value": {
+           "type": "string"
+          },
+          "key": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "dx": {
+           "type": "integer"
+          },
+          "dy": {
+           "type": "integer"
+          },
+          "seconds": {
+           "type": "integer"
+          },
+          "instruction": {
+           "type": "string"
+          },
+          "final": {
+           "type": "boolean"
+          },
+          "summary": {
+           "type": "string"
+          },
+          "unconfirmed": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "reason": {
+           "type": "string"
+          },
+          "tab": {
+           "type": "string"
+          },
+          "file": {
+           "type": "string"
+          },
+          "question": {
+           "type": "string"
+          },
+          "options": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "tool": {
+           "type": "string"
+          },
+          "arguments": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "amount": {
+           "type": "string"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "at": {
+           "type": "object",
+           "properties": {
+            "x": {
+             "type": "number"
+            },
+            "y": {
+             "type": "number"
+            }
+           },
+           "required": [
+            "x",
+            "y"
+           ],
+           "additionalProperties": false
+          },
+          "from": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          },
+          "to": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          }
+         },
+         "required": [
+          "type"
+         ],
+         "additionalProperties": false
+        }
+       },
+       "properties": {
+        "reasoning": {
+         "type": "string"
+        },
+        "actions": {
+         "type": "array",
+         "minItems": 1,
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "finding": {
+         "type": "string"
+        },
+        "ruledOut": {
+         "type": "string"
+        },
+        "goal": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "done",
+            "failed"
+           ]
+          },
+          "summary": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "status"
+         ],
+         "additionalProperties": false
+        },
+        "plan": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "goal": {
+            "type": "string"
+           },
+           "site": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "goal"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "then": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "also": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        }
+       },
+       "required": [
+        "actions"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "provider": {
+     "require_parameters": true
+    },
+    "reasoning": {
+     "enabled": false
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 60000,
+   "body": {
+    "model": "hands-model",
+    "max_tokens": 32768,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You extract structured data from one web page. The page is given to you below in whichever\nrepresentation the caller had: rendered markdown, or the filtered accessibility tree the\nbrowser reports. Read whichever you are given; do not assume the other one exists.\n\nReturn only data the page states. A field the page does not answer is omitted when the schema\nallows it and null when the schema allows null — never guessed, never inferred from the page\ntopic, and never filled with a plausible example. A wrong value is worse than a missing one:\nthe caller can see a missing field and cannot see a fabricated one."
+     },
+     {
+      "role": "user",
+      "content": "What to extract: name and price of every laptop listed\n\nPage: https://shop.example.com/results\n\nPage, as the filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. When this extraction asked where things go, a line for an element that links somewhere ends `->` and the quoted absolute URL it goes to; a line without one has no destination that was read, so never make one up. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too:\n\n0 doc \"Results\"\n1 h \"Results results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-202]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-203]\n1 inp \"Search\" [0-204]\n1 btn \"Add to cart\" [0-205]"
+     }
+    ],
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "outcrawl_reply",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "items": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       },
+       "additionalProperties": false
+      }
+     }
+    },
+    "provider": {
+     "require_parameters": true
+    }
+   }
+  },
+  {
+   "url": "https://gateway.example/v1/chat/completions",
+   "headers": {
+    "authorization": "Bearer sk-test",
+    "x-title": "Scout"
+   },
+   "timeoutMs": 12000,
+   "body": {
+    "model": "hands-model",
+    "max_tokens": 4096,
+    "messages": [
+     {
+      "role": "system",
+      "content": "You are the decision step of a browser agent. The page is frozen while you answer, so every\nnode reference in the tree you are shown is still valid when your answer arrives.\n\nAnswer with an object: {\"reasoning\": \"...\", \"actions\": [...]}.\nThe user message asks for exactly one action. Put that action first in `actions`. After it, add\nany further actions the same snapshot supports, most useful first — a caller reviewing the page\nwithout executing anything reads the whole list. If only one action makes sense, send one.\n\nONLY `actions[0]` IS PERFORMED. The rest of `actions` are alternatives — suggestions for a\nreader, never executed. If you want a second action actually carried out, it goes in `then`\n(the same tab, straight after) or in `also` (a different tab, at the same time), and only when\nthe user message offers you that field. Putting work you need done into `actions[1]` is the one\nway to have it silently not happen.\n\nThe other top-level fields are offered by the user message when they apply, and they cost you no\nextra step: `finding` for a fact you will need after this page is gone, `ruledOut` for an\napproach that did not work, `plan` and `goal` for a task with more than one outcome.\n\nA `ref` is copied verbatim from the [frameOrdinal-backendNodeId] shown beside a node. Never\ninvent one, never guess an id you were not shown, and never act on a node that is not in the\ntree: an action naming an unknown node is rejected and the step is wasted."
+     },
+     {
+      "role": "user",
+      "content": "## Plan (revised at step 1)\nsort by price\nNext:\n- sort\n\nReply with exactly one action as JSON:\n  {\"type\":\"click\",\"ref\":\"F-N\"} or {\"type\":\"click\",\"at\":{\"x\":N,\"y\":N}} (a viewport point, e.g. from page.look)\n  {\"type\":\"fill\",\"ref\":\"F-N\",\"text\":\"...\"}\n  {\"type\":\"select\",\"ref\":\"F-N\",\"value\":\"...\"}\n  {\"type\":\"press\",\"key\":\"Enter\",\"ref\":\"F-N\"}\n  {\"type\":\"hover\",\"ref\":\"F-N\"}\n  {\"type\":\"scroll\",\"ref\":\"F-N\",\"dy\":600}\n  {\"type\":\"drag\",\"from\":\"F-N\" or {\"x\":N,\"y\":N},\"to\":\"F-N\" or {\"x\":N,\"y\":N}} (press, move with the button held, release)\n  {\"type\":\"navigate\",\"url\":\"https://...\"}\n  {\"type\":\"wait\",\"seconds\":N} (let the page run N seconds, 1-60; a longer wait is several)\n  {\"type\":\"extract\",\"instruction\":\"...\"}\n  {\"type\":\"done\",\"summary\":\"the answer, if the task asked for one\"}\n  {\"type\":\"fail\",\"reason\":\"...\"}\n  {\"type\":\"openTab\",\"url\":\"https://...\"}\n  {\"type\":\"focusTab\",\"tab\":\"t2\"}\n  {\"type\":\"closeTab\",\"tab\":\"t2\"}\nAny action may also carry \"finding\":\"a fact you will need later\" — it costs you no extra step, and it is the only record that survives this page.\nFinish on what this run has read, on pages or from tools, never on memory or a guess: before done, confirm each condition the task states. While budget remains, an unconfirmed condition means keep looking; if one cannot be confirmed, say which in your answer and list each in the done action as \"unconfirmed\":[\"...\"] (absent means every condition was confirmed).\nSub-goal rules:\n- Work the ACTIVE sub-goal only. It is the first one above that is not done or failed.\n- The moment you see a sub-goal finished, close it: \"goal\":{\"id\":\"g1\",\"status\":\"done\",\"summary\":\"what happened\"}. Do not save them all for the end.\n- \"done\" ends the WHOLE task and is REFUSED while any sub-goal is still open.\n- If a sub-goal is genuinely impossible, close it \"status\":\"failed\" with the reason and move to the next one. That is a real answer; four of five is better than none.\n- Blocked the same way twice? Add \"ruledOut\":\"what did not work\" and take a different route.\n- Do not go back to a site whose sub-goal is closed.\nTask: Find the cheapest gaming laptop with at least 4 stars and over 300 reviews; report name and price.\nToday's date is 2026-10-02 (UTC). Read \"today\", \"recent\", \"last N days\", \"upcoming\" and every other date relative to now in the task against it, not against your own sense of the year.\nSchema. Record these fields with an extract action before done; the run is judged on them, not on your summary. Add \"final\":true to the extract that records your answer and the run can end on it, so nothing you planned after it happens: mark it final only as your last action, when nothing else the task asks for is left to do (a wait the task asks for is done only once Elapsed shows all of it has passed). An extract reads only the page in front of you, so mark it final on a page that states the whole answer. An extract without it is a look at the page: its result is shown to you on the next step and the run goes on.\n{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"price\":{\"type\":\"string\"}}}\nPlan:\n  g1 [active] find candidates\nFound so far. These pages are gone; this is the only record:\n  search page reached\nAlready done:\n  0 click the node -> failed: click(0-102) failed: element is covered\n  1 click the node -> ok\nOpen tabs:\n  t1 [focused] \"Shop\" https://shop.example.com/product\nURL: https://shop.example.com/product\nStep 3 of 60. Credits 1.5 of 300. Elapsed 8 s of 20 min.\nPage, filtered accessibility tree. Each line is `depth role \"name\" (state) [frame-backendNode]`. A line marked (inside iframe) starts the content of an embedded frame, and the lines nested under it are inside that frame too; act on them with their references like any other line:\n0 doc \"Product\"\n1 h \"Product results\"\n1 a \"ASUS TUF A15 - $899.99 - 4.5 stars (1,204)\" [0-302]\n1 a \"Lenovo LOQ 15 - $749.00 - 4.3 stars (311)\" [0-303]\n1 inp \"Search\" [0-304]\n1 btn \"Add to cart\" [0-305]\nThe page is frozen while you think, so every reference above is still valid when you answer.\nNow reply with exactly one action as JSON, in the grammar given at the top."
+     }
+    ],
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "outcrawl_reply",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "$defs": {
+        "action": {
+         "type": "object",
+         "properties": {
+          "type": {
+           "type": "string",
+           "enum": [
+            "click",
+            "fill",
+            "select",
+            "press",
+            "hover",
+            "scroll",
+            "drag",
+            "navigate",
+            "extract",
+            "openTab",
+            "focusTab",
+            "closeTab",
+            "wait",
+            "attachFile",
+            "createFile",
+            "ask",
+            "callTool",
+            "purchase.begin",
+            "purchase.end",
+            "done",
+            "fail"
+           ]
+          },
+          "ref": {
+           "type": "string",
+           "description": "Copied verbatim from the [frame-backendNode] shown beside the node, without the brackets."
+          },
+          "text": {
+           "type": "string"
+          },
+          "value": {
+           "type": "string"
+          },
+          "key": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "dx": {
+           "type": "integer"
+          },
+          "dy": {
+           "type": "integer"
+          },
+          "seconds": {
+           "type": "integer"
+          },
+          "instruction": {
+           "type": "string"
+          },
+          "final": {
+           "type": "boolean"
+          },
+          "summary": {
+           "type": "string"
+          },
+          "unconfirmed": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "reason": {
+           "type": "string"
+          },
+          "tab": {
+           "type": "string"
+          },
+          "file": {
+           "type": "string"
+          },
+          "question": {
+           "type": "string"
+          },
+          "options": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "tool": {
+           "type": "string"
+          },
+          "arguments": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "amount": {
+           "type": "string"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "at": {
+           "type": "object",
+           "properties": {
+            "x": {
+             "type": "number"
+            },
+            "y": {
+             "type": "number"
+            }
+           },
+           "required": [
+            "x",
+            "y"
+           ],
+           "additionalProperties": false
+          },
+          "from": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          },
+          "to": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "object",
+             "properties": {
+              "x": {
+               "type": "number"
+              },
+              "y": {
+               "type": "number"
+              }
+             },
+             "required": [
+              "x",
+              "y"
+             ],
+             "additionalProperties": false
+            }
+           ]
+          }
+         },
+         "required": [
+          "type"
+         ],
+         "additionalProperties": false
+        }
+       },
+       "properties": {
+        "reasoning": {
+         "type": "string"
+        },
+        "actions": {
+         "type": "array",
+         "minItems": 1,
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "finding": {
+         "type": "string"
+        },
+        "ruledOut": {
+         "type": "string"
+        },
+        "goal": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "done",
+            "failed"
+           ]
+          },
+          "summary": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "status"
+         ],
+         "additionalProperties": false
+        },
+        "plan": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "goal": {
+            "type": "string"
+           },
+           "site": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "goal"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "then": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        },
+        "also": {
+         "type": "array",
+         "items": {
+          "$ref": "#/$defs/action"
+         }
+        }
+       },
+       "required": [
+        "actions"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "provider": {
+     "require_parameters": true
+    },
+    "reasoning": {
+     "enabled": false
+    }
+   }
+  }
+ ]
+}

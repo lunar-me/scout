@@ -1,0 +1,54 @@
+{
+  "name": "agenthands",
+  "version": "1.1.1",
+  "description": "Human mouse and keyboard input for AI browser agents, calibrated against measured human sessions rather than guessed constants",
+  "type": "module",
+  "comment": "Vendored from github:aeonmindai/agenthands v1.1.1 (2864fec). src, data, README, CALIBRATION and LICENSE are byte-identical to the tag; test/wheel.test.mjs and harness/wheel/measure.mjs differ by one line each, importing 'agenthands' instead of a relative path into dist/, so a clean clone needs no build to test. Bun resolves the 'bun' condition to src and runs it directly (worker, captcha, bun test). tsc reads the emitted dist/*.d.ts, because src is written for this package's own compiler options (no exactOptionalPropertyTypes, DOM lib) and a consumer compiling it under the repo base config would reject it; tsc --build emits dist first through the consumers' project references. Node resolves 'default' to the built dist/index.js, as upstream did.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "bun": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./data/keystrokes.json": "./data/keystrokes.json",
+    "./data/strokes.json": "./data/strokes.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "dist",
+    "data",
+    "README.md",
+    "CALIBRATION.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "bun test ./test"
+  },
+  "keywords": [
+    "playwright",
+    "automation",
+    "browser-agent",
+    "human-input",
+    "anti-detect",
+    "mouse",
+    "keyboard"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aeonmindai/agenthands.git"
+  },
+  "peerDependencies": {
+    "playwright": "1.62.1"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  },
+  "homepage": "https://github.com/aeonmindai/agenthands"
+}

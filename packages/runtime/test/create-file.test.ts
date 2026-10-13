@@ -1,0 +1,122 @@
+/**
+ * `createFile`: the agent writes a small file into its own run's file space
+ * and then attaches it with `attachFile`, for a form that demands an upload
+ * the task did not provide ("upload your CV", BU Bench V1's "If needed, create
+ * a file."). Before this verb a run handed no file could only fail such a form:
+ * 14 of 46 misses on BU Bench V1 (2026-10-01, a lab arm, n=100) ended on
+ * "this run has no file handling".
+ */
+
+import { describe, expect, test } from 'bun:test';
+
+import type { Action } from '../src/actions';
+import { runAgent } from '../src/loop';
+import type { AgentDeps, RunFile } from '../src/loop';
+import { catalogueTree, harness, refOf } from './support';
+
+const page = catalogueTree();
+const done: Action = { type: 'done', summary: 'finished' };
+const CAPS = { steps: 5, budget: '2.00', duration: '5m' };
+
+/** A file space a test can watch: what was created, and what `list` answers. */
+function fileSpace(): {
+  readonly files: NonNullable<AgentDeps['files']>;
+  readonly created: { readonly name: string; readonly text: string }[];
+} {
+  const held: RunFile[] = [];
+  const created: { readonly name: string; readonly text: string }[] = [];
+  return {
+    created,
+    files: {
+      list: () => [...held],
+      create(spec) {
+        created.push(spec);
+        const made = { fileId: `file_made${String(created.length)}`, name: spec.name };
+        held.push(made);
+        return made;
+      },
+    },
+  };
+}
+
+function grammarRows(text: string | undefined): string[] {
+  return (text ?? '').split('\n').filter((row) => row.startsWith('  {"type":"'));
+}
+
+describe('a run whose host can write files may create one and attach it', () => {
+  test('the createFile verb is offered only when the host can create files', async () => {
+    const space = fileSpace();
+    const able = harness({ model: () => ({ action: done }), tree: page });
+    await runAgent({ ...able.deps, files: space.files }, { task: 'apply', caps: CAPS, stepFailures: 0 });
+    expect(grammarRows(able.prompts[0]?.text).some((row) => row.startsWith('  {"type":"createFile",'))).toBe(true);
+    expect(able.prompts[0]?.canCreateFiles).toBe(true);
+
+    // A host with a manifest and no writer: the verb is not offered, so no
+    // step is spent on a file that cannot be made.
+    const unable = harness({ model: () => ({ action: done }), tree: page, files: () => [] });
+    await runAgent(unable.deps, { task: 'apply', caps: CAPS, stepFailures: 0 });
+    expect(unable.prompts[0]?.text).not.toContain('createFile');
+    expect(unable.prompts[0]?.canCreateFiles).toBeUndefined();
+  });
+
+  test('created, listed by handle on the next step, then attached with that handle', async () => {
+    const space = fileSpace();
+    const h = harness({
+      model: (prompt, step) => {
+        if (step === 0) {
+          return { action: { type: 'createFile', file: 'resume.txt', text: 'Jane Doe, engineer' } };
+        }
+        const made = prompt.files?.find((file) => file.name === 'resume.txt');
+        return made !== undefined && step === 1
+          ? { action: { type: 'attachFile', ref: refOf(page, 'Search'), file: made.fileId } }
+          : { action: done };
+      },
+      perform: () => undefined,
+      tree: page,
+    });
+
+    const result = await runAgent({ ...h.deps, files: space.files }, { task: 'apply', caps: CAPS, stepFailures: 0 });
+
+    expect(result.status).toBe('completed');
+    expect(space.created).toEqual([{ name: 'resume.txt', text: 'Jane Doe, engineer' }]);
+    // The next prompt names the new file by handle, which is the only way the
+    // model can address it.
+    expect(h.prompts[1]?.files).toEqual([{ fileId: 'file_made1', name: 'resume.txt' }]);
+    expect(h.prompts[1]?.text).toContain('file_made1');
+    // And the handle reaches the page binding through the ordinary attach.
+    expect(h.performed).toEqual([{ type: 'attachFile', ref: refOf(page, 'Search'), file: 'file_made1' }]);
+    expect(result.steps.map((step) => step.error)).toEqual([undefined, undefined, undefined]);
+    // The step record carries the create, as it does every action.
+    expect(result.steps[0]?.action).toEqual({ type: 'createFile', file: 'resume.txt', text: 'Jane Doe, engineer' });
+  });
+
+  test('a name it cannot render is a step the model reads, and nothing is written', async () => {
+    const space = fileSpace();
+    const h = harness({
+      model: (_prompt, step) =>
+        step === 0 ? { action: { type: 'createFile', file: 'payload.exe', text: 'x' } } : { action: done },
+      tree: page,
+    });
+
+    const result = await runAgent({ ...h.deps, files: space.files }, { task: 'apply', caps: CAPS, stepFailures: 1 });
+
+    expect(result.status).toBe('completed');
+    expect(space.created).toEqual([]);
+    expect(result.steps[0]?.error).toContain('.txt');
+  });
+
+  test('a run whose host cannot write fails the step by name, not the run', async () => {
+    const h = harness({
+      model: (_prompt, step) =>
+        step === 0 ? { action: { type: 'createFile', file: 'cv.pdf', text: 'cv' } } : { action: done },
+      tree: page,
+      files: () => [],
+    });
+
+    const result = await runAgent(h.deps, { task: 'apply', caps: CAPS, stepFailures: 1 });
+
+    expect(result.status).toBe('completed');
+    expect(result.steps[0]?.error).toContain('cannot create files');
+    expect(h.performed).toEqual([]);
+  });
+});

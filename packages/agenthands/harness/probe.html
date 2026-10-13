@@ -1,0 +1,151 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Input Probe</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 0; padding: 24px; background:#101216; color:#E8EAEE; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color:#8A93A2; margin-bottom: 20px; }
+  #pad { width: 560px; height: 300px; border:1px solid #2A2F38; border-radius:4px; position:relative; background:#171A20; }
+  .tgt { position:absolute; width:90px; height:34px; border-radius:3px; background:#3A4E8C; color:#fff;
+         display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; font-size:13px; }
+  #t1{left:30px;top:30px} #t2{right:30px;top:110px} #t3{left:200px;bottom:30px}
+  input { background:#0C0E12; border:1px solid #2A2F38; color:#E8EAEE; padding:8px; border-radius:3px; width:260px; }
+  pre { background:#171A20; border:1px solid #2A2F38; padding:14px; border-radius:4px; overflow:auto; max-height:340px;
+        font: 12px ui-monospace, monospace; color:#B4BAC6; }
+  button.go { background:#E8EAEE; color:#101216; border:0; padding:9px 16px; border-radius:3px; cursor:pointer; font-weight:600; }
+  .row { display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; }
+</style>
+
+<h1>Input Probe</h1>
+<div class="sub">Click all three targets, then type into the field. Same page, human vs bot, same machine.</div>
+
+<div class="row">
+  <div>
+    <div id="pad">
+      <div class="tgt" id="t1">one</div>
+      <div class="tgt" id="t2">two</div>
+      <div class="tgt" id="t3">three</div>
+    </div>
+    <p><input id="txt" placeholder="type here"></p>
+      <div id="scrollbox" style="height:220px;overflow:auto;border:1px solid #888;margin-top:12px">
+        <div style="height:6000px;background:repeating-linear-gradient(#0000 0 38px,#8884 38px 40px)">
+          scroll me &mdash; up and down, a few times
+        </div>
+      </div>
+    <p><button class="go" onclick="document.getElementById('out').textContent=JSON.stringify(report(),null,2)">Report</button></p>
+  </div>
+  <pre id="out">awaiting input…</pre>
+</div>
+
+<script>
+const M = { moves: [], clicks: [], keys: [], coalesced: [], wheel: [], trusted: { move:{t:0,f:0}, click:{t:0,f:0}, key:{t:0,f:0} } };
+let lastMove = null;
+
+addEventListener('pointermove', e => {
+  const c = e.getCoalescedEvents ? e.getCoalescedEvents().length : -1;
+  M.coalesced.push(c);
+  M.moves.push({ t: e.timeStamp, x: e.clientX, y: e.clientY,
+                 dx: e.movementX, dy: e.movementY,
+                 frac: (e.clientX % 1 !== 0) || (e.clientY % 1 !== 0),
+                 pressure: e.pressure, sxEqCx: e.screenX === e.clientX });
+  M.trusted.move[e.isTrusted ? 't' : 'f']++;
+  lastMove = e.timeStamp;
+}, true);
+
+addEventListener('wheel', e => {
+  M.wheel.push({ t: e.timeStamp, dy: e.deltaY, dx: e.deltaX,
+                 wdy: e.wheelDeltaY, mode: e.deltaMode });
+}, { capture: true, passive: true });
+
+let downAt = null;
+addEventListener('pointerdown', e => { downAt = e.timeStamp; M.trusted.click[e.isTrusted?'t':'f']++; }, true);
+addEventListener('pointerup', e => {
+  if (downAt == null) return;
+  const el = e.target.closest('.tgt');
+  let offX = null, offY = null;
+  if (el) { const r = el.getBoundingClientRect();
+            offX = e.clientX - (r.left + r.width/2); offY = e.clientY - (r.top + r.height/2); }
+  M.clicks.push({ dwell: e.timeStamp - downAt, offX, offY,
+                  gapSinceMove: lastMove == null ? null : e.timeStamp - lastMove });
+  downAt = null;
+}, true);
+
+addEventListener('keydown', e => { M.keys.push({ k:'d', key:e.key, t:e.timeStamp }); M.trusted.key[e.isTrusted?'t':'f']++; }, true);
+addEventListener('keyup',   e => { M.keys.push({ k:'u', key:e.key, t:e.timeStamp }); }, true);
+
+const stats = a => {
+  if (!a.length) return null;
+  const n = a.length, m = a.reduce((x,y)=>x+y,0)/n;
+  const sd = Math.sqrt(a.reduce((s,v)=>s+(v-m)**2,0)/n);
+  return { n, mean:+m.toFixed(2), sd:+sd.toFixed(2), min:+Math.min(...a).toFixed(2), max:+Math.max(...a).toFixed(2) };
+};
+
+// A scroll "gesture" is a run of wheel events separated by < 250ms. Humans
+// scroll in bursts with pauses between them; the burst shape and the notch
+// cadence inside it are what a driver has to reproduce.
+function wheelReport() {
+  const w = M.wheel;
+  if (!w.length) return null;
+  const gaps = w.slice(1).map((v,i) => v.t - w[i].t);
+  const bursts = [];
+  let cur = [w[0]];
+  for (let i=1;i<w.length;i++) {
+    if (w[i].t - w[i-1].t > 250) { bursts.push(cur); cur = [w[i]]; } else cur.push(w[i]);
+  }
+  bursts.push(cur);
+  const inBurst = [];
+  for (const b of bursts) for (let i=1;i<b.length;i++) inBurst.push(b[i].t - b[i-1].t);
+  const dys = w.map(v => Math.abs(v.dy)).filter(v => v > 0);
+  const ratios = w.filter(v => v.dy !== 0).map(v => v.wdy / v.dy);
+  return {
+    events: w.length,
+    delta_modes: [...new Set(w.map(v=>v.mode))],
+    abs_deltaY: stats(dys),
+    // Real hardware locks wheelDeltaY to the tick count, so this ratio is a
+    // platform constant (-3 on macOS). A driver that varies deltaY while the
+    // tick count stays pinned produces pairs no device can emit.
+    wheelDelta_ratio: stats(ratios),
+    ratio_all_minus3: ratios.length ? ratios.every(r => Math.abs(r + 3) < 0.001) : null,
+    deltaY_tick_multiple_pct: dys.length ? +(100*dys.filter(d => Math.abs(d % 40) < 0.001).length/dys.length).toFixed(1) : null,
+    fractional_deltaY_pct: dys.length ? +(100*dys.filter(d => d % 1 !== 0).length/dys.length).toFixed(1) : null,
+    gesture_count: bursts.length,
+    events_per_gesture: stats(bursts.map(b => b.length)),
+    gap_within_gesture_ms: stats(inBurst),
+    gap_all_ms: stats(gaps),
+  };
+}
+
+function report() {
+  const dur = M.moves.length > 1 ? (M.moves.at(-1).t - M.moves[0].t)/1000 : 0;
+  const dwells = [];   // per-key dwell
+  const flights = [];  // between keydowns
+  const downs = M.keys.filter(k => k.k === 'd');
+  for (const d of downs) { const u = M.keys.find(k => k.k==='u' && k.key===d.key && k.t > d.t); if (u) dwells.push(u.t - d.t); }
+  for (let i=1;i<downs.length;i++) flights.push(downs[i].t - downs[i-1].t);
+
+  return {
+    mouse: {
+      events: M.moves.length,
+      seconds: +dur.toFixed(2),
+      rate_hz: dur > 0 ? +(M.moves.length/dur).toFixed(1) : null,
+      coalesced: stats(M.coalesced),
+      coalesced_all_one: M.coalesced.length ? M.coalesced.every(c => c === 1) : null,
+      fractional_coords_pct: M.moves.length ? +(100*M.moves.filter(m=>m.frac).length/M.moves.length).toFixed(1) : null,
+      screenX_equals_clientX_pct: M.moves.length ? +(100*M.moves.filter(m=>m.sxEqCx).length/M.moves.length).toFixed(1) : null,
+      pressure_nonzero_pct: M.moves.length ? +(100*M.moves.filter(m=>m.pressure>0).length/M.moves.length).toFixed(1) : null,
+    },
+    clicks: {
+      count: M.clicks.length,
+      dwell_ms: stats(M.clicks.map(c=>c.dwell)),
+      offset_x: stats(M.clicks.filter(c=>c.offX!=null).map(c=>c.offX)),
+      offset_y: stats(M.clicks.filter(c=>c.offY!=null).map(c=>c.offY)),
+      dead_centre_count: M.clicks.filter(c=>c.offX!=null && Math.abs(c.offX)<1 && Math.abs(c.offY)<1).length,
+      gap_since_last_move_ms: stats(M.clicks.filter(c=>c.gapSinceMove!=null).map(c=>c.gapSinceMove)),
+    },
+    wheel: wheelReport(),
+    keys: { dwell_ms: stats(dwells), flight_ms: stats(flights) },
+    isTrusted: M.trusted,
+  };
+}
+window.__report = report;
+</script>
