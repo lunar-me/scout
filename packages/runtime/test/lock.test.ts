@@ -29,7 +29,14 @@
 import { describe, expect, test } from 'bun:test';
 
 import type { Action } from '../src/actions';
-import type { AgentInterrupt, ChallengeResolution, ChallengeSolving, LockReleaseReason, ToolPort } from '../src/loop';
+import type {
+  AgentInterrupt,
+  ChallengeResolution,
+  ChallengeSolving,
+  LockedPage,
+  LockReleaseReason,
+  ToolPort,
+} from '../src/loop';
 import { LOOK_TOOL } from '../src/look';
 import {
   LockLostError,
@@ -771,6 +778,187 @@ describe('a lock the browser released on its own is not a lock', () => {
       expect(session.lostLock).toBe('timeout');
       expect(session.dropped).toBe(1);
     });
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * A navigation stales references, and an action that names none has none
+ * ------------------------------------------------------------------ */
+
+/**
+ * The page navigated itself while the model was thinking: production's
+ * commonest lost lock (a search page redirecting to its own URL plus a
+ * tracking parameter), and the action chosen next was refused even when it
+ * named no node at all.
+ */
+describe('an action that names no node is not refused for a lock the page took back', () => {
+  const UNNAMED: readonly { readonly name: string; readonly touch: string; run(page: LockedPage): Promise<unknown> }[] = [
+    { name: 'navigate', touch: 'perform', run: (locked) => locked.perform({ type: 'navigate', url: 'https://example.com/next' }) },
+    { name: 'wait', touch: 'perform', run: (locked) => locked.perform({ type: 'wait', seconds: 1 }) },
+    { name: 'openTab', touch: 'tabs.open', run: (locked) => locked.openTab('https://example.com/other') },
+    { name: 'extract', touch: 'extract', run: (locked) => locked.extract(undefined, 'the heading') },
+  ];
+  const TABS = [{ id: 't0', url: 'https://example.com/' }];
+
+  for (const reason of ['navigated', 'timeout'] as const) {
+    for (const op of UNNAMED) {
+      test(`${reason}: ${op.name} runs under a new freeze over the live page`, async () => {
+        const h = harness({ tree: page, tabs: TABS, model: () => ({ action: done }) });
+        const session = new PageSession(h.deps);
+
+        await session.withLock(async (locked) => {
+          session.noteLockReleased(h.release(reason));
+          await op.run(locked);
+          expect(session.locked).toBe(true);
+        });
+
+        // Frozen again before it touched the page, and released once at depth 0.
+        expect(h.browser.liveTouches).toBe(0);
+        expect(h.events).toEqual(['lock', `released:${reason}`, 'lock', op.touch, 'unlock']);
+        expect(session.acquires).toBe(2);
+        expect(session.acquires).toBe(session.releases + session.dropped);
+      });
+    }
+  }
+
+  test('a node action later in the same frame still refuses: its reference belongs to the replaced document', async () => {
+    const h = harness({ tree: page, model: () => ({ action: done }) });
+    const session = new PageSession(h.deps);
+
+    let touched: unknown;
+    await session.withLock(async (locked) => {
+      session.noteLockReleased(h.release('navigated'));
+      await locked.perform({ type: 'wait', seconds: 1 });
+      touched = await locked.perform(click).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+    });
+
+    expect(touched).toBeInstanceOf(LockLostError);
+    expect((touched as LockLostError).reason).toBe('navigated');
+    expect((touched as LockLostError).operation).toBe('perform(click)');
+    expect(h.performed.map((action) => action.type)).toEqual(['wait']);
+  });
+
+  for (const reason of ['rendererGone', 'sessionEnded'] as const) {
+    test(`${reason}: a navigate is still refused and nothing is retaken`, async () => {
+      const h = harness({ tree: page, model: () => ({ action: done }) });
+      const session = new PageSession(h.deps);
+
+      let touched: unknown;
+      await session.withLock(async (locked) => {
+        session.noteLockReleased(h.release(reason));
+        touched = await locked.perform({ type: 'navigate', url: 'https://example.com/next' }).then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+      });
+
+      expect(touched).toBeInstanceOf(LockLostError);
+      expect(h.performed).toEqual([]);
+      expect(h.events.filter((event) => event === 'lock')).toHaveLength(1);
+    });
+  }
+
+  test("the navigate's own commit takes the new freeze too, and the post-action read retakes it", async () => {
+    let session: PageSession | undefined;
+    const h = harness({
+      tree: page,
+      model: () => ({ action: done }),
+      perform: (action) => {
+        if (action.type === 'navigate') {
+          session?.noteLockReleased(h.release('navigated'));
+        }
+      },
+    });
+    session = new PageSession(h.deps);
+
+    await session.withLock(async (locked) => {
+      session?.noteLockReleased(h.release('navigated'));
+      await locked.perform({ type: 'navigate', url: 'https://example.com/next' });
+      await locked.snapshotAfterAction();
+    });
+
+    expect(h.browser.liveTouches).toBe(0);
+    expect(h.events).toEqual([
+      'lock',
+      'released:navigated',
+      'lock',
+      'perform',
+      'released:navigated',
+      'lock',
+      'snapshot',
+      'unlock',
+    ]);
+    expect(session.dropped).toBe(2);
+    expect(session.acquires).toBe(session.releases + session.dropped);
+  });
+
+  test('through runAgent: the navigate the model chose while the page redirected itself is performed', async () => {
+    let session: PageSession | undefined;
+    const next: Action = { type: 'navigate', url: 'https://example.com/next' };
+    const h = harness({
+      tree: page,
+      model: (_prompt, step) => {
+        if (step === 0) {
+          session?.noteLockReleased(h.release('navigated'));
+          return { action: next };
+        }
+        return { action: done };
+      },
+    });
+
+    const result = await runAgent(h.deps, {
+      task: 'search',
+      caps: CAPS,
+      stepFailures: null,
+      settle: false,
+      onSession: (handed) => {
+        session = handed;
+      },
+    });
+
+    expect(result.status).toBe('completed');
+    expect(result.steps.map((step) => step.error)).toEqual([undefined, undefined]);
+    expect(h.performed).toEqual([next]);
+    expect(h.browser.liveTouches).toBe(0);
+  });
+
+  test('through runAgent: a click chosen on the replaced document is refused once, and the next step clicks from a fresh read', async () => {
+    let session: PageSession | undefined;
+    const h = harness({
+      tree: page,
+      model: (_prompt, step) => {
+        if (step === 0) {
+          session?.noteLockReleased(h.release('navigated'));
+          return { action: click };
+        }
+        return { action: step === 1 ? click : done };
+      },
+    });
+
+    const result = await runAgent(h.deps, {
+      task: 'search',
+      caps: CAPS,
+      stepFailures: 3,
+      settle: false,
+      onSession: (handed) => {
+        session = handed;
+      },
+    });
+
+    expect(result.status).toBe('completed');
+    expect(result.steps[0]?.error).toContain('released the action-lock (navigated)');
+    expect(result.steps.slice(1).map((step) => step.error)).toEqual([undefined, undefined]);
+    // Step 1 read the page again under its own freeze before it was asked.
+    expect(h.events.slice(h.events.indexOf('released:navigated') + 1, h.events.indexOf('perform'))).toEqual([
+      'lock',
+      'snapshot',
+      'model',
+    ]);
+    expect(h.performed).toEqual([click]);
+    expect(h.browser.liveTouches).toBe(0);
   });
 });
 

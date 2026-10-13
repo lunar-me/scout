@@ -350,4 +350,74 @@ describe('an email address nobody gave the run is never typed into a page', () =
       expect(result.steps[0]?.error).toBeUndefined();
     }
   });
+
+  /** A volunteer sign-up page: the form the task means, and a newsletter box in the footer. */
+  const signup = tree(
+    node({
+      role: 'RootWebArea',
+      name: 'Volunteer sign-up',
+      children: [
+        node({ role: 'textbox', name: 'Full name', state: { required: true } }),
+        node({ role: 'textbox', name: 'Email', state: { required: true } }),
+        node({ role: 'textbox', name: 'Work email *' }),
+        node({ role: 'button', name: 'Register' }),
+        node({ role: 'textbox', name: 'Get our newsletter' }),
+      ],
+    }),
+    'https://volunteers.test/signup',
+  );
+  const fillTask = 'Open the volunteer page, fill out the registration form and submit it.';
+
+  test('a task that says to fill in and submit a form gets a test-domain address typed into its required fields', async () => {
+    for (const field of ['Email', 'Work email *']) {
+      const fill: Action = { type: 'fill', ref: refOf(signup, field), text: 'jane.doe@example.com' };
+      const h = harness({ tree: signup, model: script({ action: fill }) });
+
+      const result = await runAgent(h.deps, { task: fillTask, caps: CAPS, stepFailures: null });
+
+      expect(h.performed).toEqual([fill]);
+      expect(result.steps[0]?.error).toBeUndefined();
+    }
+  });
+
+  test('on a form task an address at a real domain is refused and the run is told to use example.com', async () => {
+    const h = harness({
+      tree: signup,
+      model: script({ action: { type: 'fill', ref: refOf(signup, 'Email'), text: 'jane.doe@gmail.com' } }),
+    });
+
+    const result = await runAgent(h.deps, { task: fillTask, caps: CAPS, stepFailures: null });
+
+    expect(h.performed).toEqual([]);
+    expect(result.steps[0]?.error).toContain('"jane.doe@gmail.com"');
+    expect(result.steps[0]?.error).toContain('use one at example.com');
+  });
+
+  test('on a form task a box the form does not require is still refused', async () => {
+    const h = harness({
+      tree: signup,
+      model: script({ action: { type: 'fill', ref: refOf(signup, 'Get our newsletter'), text: 'jane.doe@example.com' } }),
+    });
+
+    const result = await runAgent(h.deps, { task: fillTask, caps: CAPS, stepFailures: null });
+
+    expect(h.performed).toEqual([]);
+    expect(result.steps[0]?.error).toContain('close it with its close control or Escape');
+  });
+
+  test('a task that only reads a form\u2019s fields does not permit filling them', async () => {
+    const h = harness({
+      tree: signup,
+      model: script({ action: { type: 'fill', ref: refOf(signup, 'Email'), text: 'jane.doe@example.com' } }),
+    });
+
+    const result = await runAgent(h.deps, {
+      task: 'Complete these steps. 1. Open the volunteer page and list which fields the registration form requires.',
+      caps: CAPS,
+      stepFailures: null,
+    });
+
+    expect(h.performed).toEqual([]);
+    expect(result.steps[0]?.error).toContain('neither the task nor the page gave you');
+  });
 });

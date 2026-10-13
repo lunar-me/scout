@@ -1545,6 +1545,14 @@ export class LockLostError extends Error {
 }
 
 /**
+ * The `perform` verbs that name no node and aim at no point on the page, so a
+ * freeze lost to a navigation stales nothing they carry. A `press` or `scroll`
+ * without a ref is NOT here: it lands on whatever has focus or is in view,
+ * which is a fact about the document the step read.
+ */
+const UNNAMED_PERFORMS: ReadonlySet<Action['type']> = new Set(['navigate', 'wait']);
+
+/**
  * The frozen page. Every method is guarded by the lock depth rather than by
  * possession of this object, so a handle captured inside `withLock` and used
  * after it returns throws exactly like a bare call does.
@@ -1829,6 +1837,19 @@ export class PageSession {
   #retaken = false;
 
   /**
+   * Why the references this frame read are stale, once an operation that names
+   * no node has taken a new freeze over the live page ({@link #requireUnnamed}).
+   *
+   * Separate from `#lost` for `#retaken`'s reason: after the retake the page IS
+   * frozen, so `#lost` is cleared and a later loss of THIS freeze is recorded
+   * like any other, while the tree the step was chosen from still belongs to a
+   * document the browser replaced. Every operation that names a node goes on
+   * refusing for the rest of the frame. Cleared by the next top-level
+   * {@link withLock}, with `#lost`.
+   */
+  #stale: LockLossReason | undefined;
+
+  /**
    * True only when the page is really frozen: a lock frame is open, no solve
    * has taken the freeze down, and either the browser has not released it
    * underneath us or {@link snapshotAfterAction} has put a new one up. A bare
@@ -1950,6 +1971,7 @@ export class PageSession {
       // Whatever became of the last freeze, this is a new one over whatever
       // document is current now.
       this.#lost = undefined;
+      this.#stale = undefined;
       // Published BEFORE the round trip, and this is not tidiness.
       // `this.#deps.lock()` freezes the page as soon as the browser handles it,
       // but the refcount would not rise until the promise resolved. In that
@@ -2264,7 +2286,7 @@ export class PageSession {
   }
 
   async snapshot(): Promise<AxTree> {
-    this.#require('snapshot');
+    this.#require('snapshot', { unnamed: true });
     return this.#deps.snapshot();
   }
 
@@ -2667,7 +2689,12 @@ export class PageSession {
   }
 
   async perform(action: Action, signal?: AbortSignal, allowanceMs?: number): Promise<PerformOutcome> {
-    this.#require(`perform(${action.type})`);
+    const operation = `perform(${action.type})`;
+    if (UNNAMED_PERFORMS.has(action.type)) {
+      await this.#requireUnnamed(operation);
+    } else {
+      this.#require(operation);
+    }
     return (
       (await (allowanceMs !== undefined
         ? this.#deps.perform(action, signal, allowanceMs)
@@ -2737,7 +2764,7 @@ export class PageSession {
     bound?: ExtractBound,
     selection?: ExtractSelection,
   ): Promise<ExtractOutcome> {
-    this.#require('extract');
+    await this.#requireUnnamed('extract');
     const outcome = await this.#deps.extract(schema, instruction, framing, bound, selection);
     if (schema !== undefined || typeof outcome.data !== 'string') {
       return outcome;
@@ -2796,7 +2823,7 @@ export class PageSession {
     // Production 2026-09-25 18:53Z (n=2): web.search and page.look were both
     // refused "not performed" mid-solve. Clicks, typing, navigation and
     // scrolls still are, through `#require`.
-    this.#require(`callTool(${tool})`, { duringSolve: true });
+    await this.#requireUnnamed(`callTool(${tool})`, { duringSolve: true });
     const port = this.#deps.tools;
     if (port === undefined) {
       return {
@@ -2931,7 +2958,7 @@ export class PageSession {
    * it believe it had switched tabs.
    */
   async listTabs(): Promise<readonly TabInfo[]> {
-    this.#require('listTabs');
+    await this.#requireUnnamed('listTabs');
     const tabs = this.#deps.tabs;
     return tabs === undefined ? [] : tabs.list();
   }
@@ -2947,17 +2974,17 @@ export class PageSession {
   }
 
   async openTab(url: string): Promise<TabId> {
-    this.#require(`openTab(${url})`);
+    await this.#requireUnnamed(`openTab(${url})`);
     return this.#tabControl('openTab').open(url);
   }
 
   async focusTab(id: TabId): Promise<void> {
-    this.#require(`focusTab(${id})`);
+    await this.#requireUnnamed(`focusTab(${id})`);
     await this.#tabControl('focusTab').focus(id);
   }
 
   async closeTab(id: TabId): Promise<void> {
-    this.#require(`closeTab(${id})`);
+    await this.#requireUnnamed(`closeTab(${id})`);
     await this.#tabControl('closeTab').close(id);
   }
 
@@ -3168,12 +3195,68 @@ export class PageSession {
     this.#lost = cause;
   }
 
-  #require(operation: string, allow?: { readonly duringSolve: true }): void {
+  /**
+   * `#require` for an operation that NAMES NO NODE: a navigate, a wait, a tab
+   * action or the tab list, an extraction, a tool call. A freeze the browser released because
+   * the page navigated, or because its deadline ran out, is retaken over the
+   * live page instead of refused.
+   *
+   * The refusal exists for the references the step read under the lost freeze,
+   * and an operation with no reference has none to be stale. Refusing it bought
+   * nothing and cost the step. MEASURED, production 2026-10-06..13 (n=1313 agent
+   * runs, 20,465 steps): 69 steps in 43 runs were refused this way, every one
+   * `navigated`, and 41 of the 69 named no node (23 navigate, 12 wait, 2
+   * extract, 2 callTool, 1 openTab, 1 listTabs). The commonest site (33 of the
+   * 69) is a search results page that redirects itself to its own URL plus a
+   * tracking parameter 0.3-0.4 s after it commits (stock Chromium, fresh
+   * profile, 3 of 3): the refused step had read the first document, and the
+   * step after it read the redirect's.
+   *
+   * Only `navigated` and `timeout`, {@link snapshotAfterAction}'s rule for its
+   * reason: both leave a live page that nobody else holds. The new freeze is
+   * this frame's from here (released by {@link withLock} at depth 0, so
+   * `acquires === releases + dropped` holds), and `#stale` keeps every operation
+   * that names a node refusing for the rest of the frame.
+   */
+  async #requireUnnamed(operation: string, allow?: { readonly duringSolve: true }): Promise<void> {
+    const lost = this.#lost;
+    if (this.#depth > 0 && this.#solving.length === 0 && (lost === 'navigated' || lost === 'timeout')) {
+      if (this.#retaken) {
+        // `snapshotAfterAction` already froze the live page; that freeze is
+        // now the frame's ordinary one.
+        this.#retaken = false;
+        this.#lost = undefined;
+      } else {
+        // As `snapshotAfterAction` takes it, for the same reason: cleared and
+        // published before the round trip.
+        this.#lost = undefined;
+        this.#acquiring = (async (): Promise<void> => {
+          await this.#deps.lock();
+          this.#acquires += 1;
+        })();
+        try {
+          await this.#acquiring;
+        } catch (lockError) {
+          this.#acquiring = undefined;
+          this.#lost = lost;
+          throw lockError;
+        }
+        this.#acquiring = undefined;
+      }
+      this.#stale ??= lost;
+    }
+    this.#require(operation, { ...allow, unnamed: true });
+  }
+
+  #require(operation: string, allow?: { readonly duringSolve?: true; readonly unnamed?: true }): void {
     if (this.#depth === 0) {
       throw new LockNotHeldError(operation);
     }
     if (this.#lost !== undefined) {
       throw new LockLostError(operation, this.#lost);
+    }
+    if (this.#stale !== undefined && allow?.unnamed !== true) {
+      throw new LockLostError(operation, this.#stale);
     }
     if (this.#solving.length > 0 && allow?.duringSolve !== true) {
       throw new SolveInProgressError(operation, [...this.#solving]);
@@ -4032,6 +4115,23 @@ const TASK_PERMITS_INVENTED =
 const EMAIL_ADDRESS = /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}/gi;
 
 /**
+ * A task that tells the run to fill in or submit a form: a fill, complete or
+ * submit verb and a form or its fields in the same sentence ("fill in all
+ * required fields and submit", "complete the sign-up form", "the form ...
+ * submit it"). A task that only names a form's fields to READ them ("report
+ * what fields the sign-up page requires") has no such verb beside them.
+ */
+const TASK_FILLS_A_FORM =
+  /\b(?:fill(?:ing)?(?:\s+(?:in|out))?|complet(?:e|ing)|submit(?:ting)?)\b[^.!?;\n]*\b(?:forms?|fields?)\b|\bforms?\b[^.!?;\n]*\b(?:fill|complete|submit)\b/i;
+
+/**
+ * The domains reserved for examples and tests, which no person's mailbox can
+ * be at: example.com, example.net and example.org (RFC 2606) and anything
+ * under .test, .example, .invalid or .localhost (RFC 6761).
+ */
+const RESERVED_EMAIL_DOMAIN = /@(?:[a-z0-9-]+\.)*(?:example\.(?:com|net|org)|[a-z0-9-]+\.(?:test|example|invalid|localhost))$/i;
+
+/**
  * "DO NOT TYPE AN EMAIL ADDRESS NOBODY GAVE YOU": the refusal of a `fill` whose
  * text carries one, or `undefined` to let it through.
  *
@@ -4049,8 +4149,21 @@ const EMAIL_ADDRESS = /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}/gi;
  * recorded finding — or when the task permits made-up data: it speaks of
  * email at all ("sign up with a test email"), or asks for dummy, fake,
  * sample, placeholder, random or made-up values or for test data ("fill the
- * form with dummy values"). Everything else is refused at the dispatch site,
- * before the page is touched, with what to do instead.
+ * form with dummy values").
+ *
+ * Also let through on a task that tells the run to fill in and submit a form
+ * ({@link TASK_FILLS_A_FORM}) when the field is one that form requires (marked
+ * required in the tree, or labelled with an asterisk) and the address is on a
+ * reserved test domain ({@link RESERVED_EMAIL_DOMAIN}), which no person's
+ * mailbox can be at. BU Bench run 2026-10-13: 6 runs (`run_…`) told to fill in
+ * a form's required fields and submit it, with no data given, had their
+ * test@example.com refused; all 6 then asked a question nobody would answer
+ * and parked on it, and the 4 of them that have ended failed after the full
+ * 30-minute park with nothing submitted. A form task needs that address; the
+ * honeybirdette task never did and still does not get it.
+ *
+ * Everything else is refused at the dispatch site, before the page is
+ * touched, with what to do instead.
  */
 export function inventedEmailRefusal(
   action: Action,
@@ -4070,6 +4183,16 @@ export function inventedEmailRefusal(
     .toLowerCase();
   const invented = typed.find((address) => !given.includes(address.toLowerCase()));
   if (invented === undefined) return undefined;
+  const field = findNode(page, action.ref);
+  if (TASK_FILLS_A_FORM.test(task) && (field?.state?.required === true || /\*\s*$/.test(field?.name ?? ''))) {
+    if (typed.every((address) => RESERVED_EMAIL_DOMAIN.test(address))) return undefined;
+    return (
+      `not performed: "${invented}" is an email address nobody gave you, at a domain that can be somebody\u2019s ` +
+      'real mailbox. The task asks you to fill in this form and the form requires the field, so a made-up ' +
+      'address is fine, on the reserved test domain only: use one at example.com (for example ' +
+      'jane.doe@example.com). Other required details the task does not give may be made up the same way.'
+    );
+  }
   return (
     `not performed: "${invented}" is an email address that neither the task nor the page gave you, and ` +
     'typing made-up personal details into a site\u2019s form is never part of a task. A field that only asks ' +
