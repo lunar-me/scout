@@ -1220,8 +1220,8 @@ export function validateAction(action: unknown, tree: AxTree): ValidationResult<
     }
     case 'createFile': {
       const file = requireString(action, 'file', errors);
-      // Empty content is allowed: a placeholder PNG prints nothing, and an
-      // empty `.txt` is still a file a form will accept.
+      // Empty content passes here: a placeholder PNG or PDF needs none. The
+      // renderer refuses an empty TEXT file, in words the model can act on.
       const text = action['text'];
       if (typeof text !== 'string') {
         errors.push('text must be a string (the file content; "" is allowed)');

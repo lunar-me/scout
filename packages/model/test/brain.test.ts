@@ -1996,6 +1996,22 @@ describe('class mechanisms run in the port, not in the prompt', () => {
   });
 
   /**
+   * The brain's own list of what it did not confirm reaches the loop's
+   * unconfirmed door on the `done` action. MUTATIONS THIS CATCHES: the list
+   * dropped between the brain's reply and the action (it was, for every brain
+   * finish, until 2026-10-14); blank entries passed through as conditions.
+   */
+  test('a brain done carries its unconfirmed list onto the action', async () => {
+    const provider = new FakeProvider([
+      brain({ do: 'done', why: 'from the read', answer: 'Shop A, opened 1987', unconfirmed: ['the street address', ' '] }),
+    ]);
+    const { port } = brainPort(provider, PLAN, true);
+    const base = promptFor(TREE, 'the shop that opened before 1990, and its street address');
+    const choice = await port.choose({ ...base, extracted: [{ step: 1, text: 'Shop A opened 1987' }] } as typeof base);
+    expect(choice.action).toEqual({ type: 'done', summary: 'Shop A, opened 1987', unconfirmed: ['the street address'] });
+  });
+
+  /**
    * MUTATIONS THIS CATCHES: the brain shown only the loop's 600-character cut
    * of a list it asked for (live10-ad789359 amazon: 4 narrower re-reads, 7
    * brain calls), and a whole read attached to an entry it did not produce.

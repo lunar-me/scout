@@ -405,6 +405,59 @@ describe('an email address nobody gave the run is never typed into a page', () =
     expect(result.steps[0]?.error).toContain('close it with its close control or Escape');
   });
 
+  /** A puzzle page whose first level is a form of required personal fields. */
+  const challenge = tree(
+    node({
+      role: 'RootWebArea',
+      name: 'Puzzle trail: level 1',
+      children: [
+        node({ role: 'textbox', name: 'First Name *' }),
+        node({ role: 'textbox', name: 'Email *' }),
+        node({ role: 'button', name: 'Next level' }),
+        node({ role: 'textbox', name: 'Get our newsletter' }),
+      ],
+    }),
+    'https://puzzles.test/trail/1',
+  );
+  const challengeTask = 'Open the puzzle trail and complete the challenge on its first level.';
+
+  test('a task that says to complete the page\u2019s challenge gets a test-domain address into its required field', async () => {
+    const fill: Action = { type: 'fill', ref: refOf(challenge, 'Email *'), text: 'john.smith@example.com' };
+    const h = harness({ tree: challenge, model: script({ action: fill }) });
+
+    const result = await runAgent(h.deps, { task: challengeTask, caps: CAPS, stepFailures: null });
+
+    expect(h.performed).toEqual([fill]);
+    expect(result.steps[0]?.error).toBeUndefined();
+  });
+
+  test('on a challenge task a real domain and a stray box are still refused', async () => {
+    for (const [field, text, says] of [
+      ['Email *', 'john.smith@gmail.com', 'use one at example.com'],
+      ['Get our newsletter', 'john.smith@example.com', 'close it with its close control or Escape'],
+    ] as const) {
+      const h = harness({ tree: challenge, model: script({ action: { type: 'fill', ref: refOf(challenge, field), text } }) });
+
+      const result = await runAgent(h.deps, { task: challengeTask, caps: CAPS, stepFailures: null });
+
+      expect(h.performed).toEqual([]);
+      expect(result.steps[0]?.error).toContain(says);
+    }
+  });
+
+  test('a task that reads a sign-up page and does not complete it still refuses the address', async () => {
+    const h = harness({ tree: challenge, model: script({ action: { type: 'fill', ref: refOf(challenge, 'Email *'), text: 'john.smith@example.com' } }) });
+
+    const result = await runAgent(h.deps, {
+      task: 'Complete the following site task. 1. Click "Create account" and report what fields are required on the first signup page.',
+      caps: CAPS,
+      stepFailures: null,
+    });
+
+    expect(h.performed).toEqual([]);
+    expect(result.steps[0]?.error).toContain('neither the task nor the page gave you');
+  });
+
   test('a task that only reads a form\u2019s fields does not permit filling them', async () => {
     const h = harness({
       tree: signup,

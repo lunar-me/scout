@@ -19,8 +19,8 @@ import { describe, expect, test } from 'bun:test';
 import type { Action } from '../src/actions';
 import { validateAction } from '../src/actions';
 import type { ModelChoice } from '../src/loop';
-import { runAgent, runShare } from '../src/loop';
-import { catalogueTree, harness, refOf } from './support';
+import { admittedGaps, namedSource, runAgent, runShare } from '../src/loop';
+import { catalogueTree, harness, node, refOf, tree } from './support';
 
 const page = catalogueTree();
 const click: Action = { type: 'click', ref: refOf(page, 'Search') };
@@ -82,6 +82,87 @@ describe('a done that lists unconfirmed conditions', () => {
     expect(checked(['a', '', 3, ' b '])).toEqual({ ok: true, value: { type: 'done', summary: 's', unconfirmed: ['a', 'b'] } });
     expect(checked('the street')).toEqual({ ok: true, value: { type: 'done', summary: 's', unconfirmed: ['the street'] } });
     expect(checked({ street: true })).toEqual({ ok: true, value: { type: 'done', summary: 's' } });
+  });
+});
+
+/**
+ * The same gap, carried by the answer's own words or by a run that looked
+ * nowhere, reaches the same door: once per run, spend-gated. MUTATIONS THIS
+ * CATCHES: a prose admission accepted as a finish (BU Bench V1 2026-10-13:
+ * three such finishes at 6-24% of the run, all failed); a clean answer or one
+ * that says it DID verify held; a step-0 answer that opened nothing accepted
+ * on a task that names where to look; any of these held twice, or past half.
+ */
+describe('a done whose answer names its own gap', () => {
+  test('is declined once with the sentence that names it, and the next finish stands', async () => {
+    const h = harness({
+      tree: page,
+      model: (_prompt, step): ModelChoice =>
+        step === 0
+          ? { action: { type: 'done', summary: 'Shop A. Its opening year is unverified: the archive page did not load.' } }
+          : step === 1
+            ? { action: click }
+            : { action: { type: 'done', summary: 'Shop B, opened 1987. I could not confirm the street.' } },
+    });
+
+    const result = await runAgent(h.deps, { task: 'the shop that opened before 1990', caps: BUDGET, stepFailures: null, settle: false });
+
+    expect(result.stepsUsed).toBe(3);
+    expect(result.steps[0]?.held).toBe('unconfirmed');
+    expect(h.prompts[1]?.text ?? '').toContain('Its opening year is unverified: the archive page did not load.');
+    expect(result.data).toBe('Shop B, opened 1987. I could not confirm the street.');
+    expect(result.status).toBe('completed');
+  });
+
+  test('stands at once when half the budget is already spent', async () => {
+    const h = harness({
+      tree: page,
+      model: (_prompt, step): ModelChoice =>
+        step < 3 ? { action: click } : { action: { type: 'done', summary: 'Shop A (best estimate; not confirmed on the archive).' } },
+      perform: () => ({ credits: '2' }),
+    });
+
+    const result = await runAgent(h.deps, { task: 'the shop', caps: BUDGET, stepFailures: null, settle: false });
+
+    expect(result.stepsUsed).toBe(4);
+    expect(result.steps.some((step) => step.held === 'unconfirmed')).toBe(false);
+  });
+
+  test('reads only an answer that says it did not establish a part', () => {
+    expect(admittedGaps('Shop A, opened 1987. I verified the year on the archive page and confirmed the street.')).toEqual([]);
+    expect(admittedGaps('1. A, 77%. 2. B, score not retrieved. 3. C, 81%.')).toEqual(['2. B, score not retrieved.']);
+    expect(admittedGaps('Checked a sample of the list, not every page.\nQualifying: A, B.')).toEqual(['Checked a sample of the list, not every page.']);
+  });
+});
+
+describe('a done that opened nothing', () => {
+  const blank = tree(node({ role: 'RootWebArea' }), 'about:blank');
+  const answerTwice = (_prompt: unknown, step: number): ModelChoice => ({ action: { type: 'done', summary: step === 0 ? 'pointer' : 'pointers' } });
+
+  test('is declined once on a task that names its source, with the source named back', async () => {
+    const h = harness({ tree: blank, model: answerTwice });
+
+    const result = await runAgent(h.deps, { task: 'the longest word, using the list at https://example.org/words.txt', caps: BUDGET, stepFailures: null, settle: false });
+
+    expect(result.stepsUsed).toBe(2);
+    expect(result.steps[0]?.held).toBe('unconfirmed');
+    expect(h.prompts[1]?.text ?? '').toContain('https://example.org/words.txt');
+    expect(result.data).toBe('pointers');
+  });
+
+  test('stands on a task that names no source', async () => {
+    const h = harness({ tree: blank, model: answerTwice });
+
+    const result = await runAgent(h.deps, { task: 'the longest word you can spell from these letters: abrl', caps: BUDGET, stepFailures: null, settle: false });
+
+    expect(result.stepsUsed).toBe(1);
+    expect(result.data).toBe('pointer');
+  });
+
+  test('a named source is a URL or a bare domain, never an email address', () => {
+    expect(namedSource('use the words_alpha list at https://github.com/dwyl/english-words.')).toBe('https://github.com/dwyl/english-words');
+    expect(namedSource('prices on ikea.com/us, please')).toBe('ikea.com/us');
+    expect(namedSource('email jane@example.com the words_alpha.txt total')).toBeUndefined();
   });
 });
 

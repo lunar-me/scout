@@ -1882,7 +1882,12 @@ export class HarnessModelPort implements ModelPort {
             }
           }
         }
-        return decided({ type: 'done', summary: decision.answer }, finishClosures(decision, prompt));
+        // The brain's own list of what it did not confirm reaches the loop's
+        // unconfirmed door on the action, as the actuator's `done` carries it.
+        return decided(
+          { type: 'done', summary: decision.answer, ...(decision.unconfirmed.length > 0 ? { unconfirmed: decision.unconfirmed } : {}) },
+          finishClosures(decision, prompt),
+        );
       case 'fail':
         // A FAIL THAT NAMES WHERE THE ANSWER IS IS ASKED ONCE MORE: it ends
         // the run with no answer while its own reason names a site or URL that

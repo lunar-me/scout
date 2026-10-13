@@ -3474,8 +3474,9 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
     const path = await files.stage(fileId);
     if (path === undefined) {
       throw new FilesUnavailableError(
-        `no file ${fileId} on this run. The handle is the id POST /v1/agent/{id}/files ` +
-          'answered with; a file is destroyed when its run ends and cannot be attached after.',
+        `no file ${fileId} on this run. Name a file the run holds by the handle listed beside it or by its ` +
+          'exact name. A file reaches a run through POST /v1/agent/{id}/files or createFile, and is destroyed when ' +
+          'its run ends.',
       );
     }
 

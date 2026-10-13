@@ -6,11 +6,15 @@
  * Runs only where Playwright's Chromium is installed (`chromiumPath`), headless
  * and closed after each test. It drives a stock browser, never Outcrawl's.
  */
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
 import { filterTree, runAgent, serializeTree, walk, type AgentDeps, type AxNode, type AxTree, type ModelChoice } from '@outcrawl/runtime';
 
-import { bindAgent, handsPortFor, stockFlavor, type CdpPage, type HandsPort } from '../src/index';
+import { bindAgent, encodePng, handsPortFor, stockFlavor, type CdpPage, type FilePort, type HandsPort } from '../src/index';
 import { chromiumPath, launchChromium, type StockChromium } from './support/chromium';
 
 const FORM = `<!doctype html><html><head><title>Order</title></head><body style="margin:0">
@@ -276,6 +280,91 @@ seen.globals = Object.getOwnPropertyNames(window).length;
         expect(seen[0]).toBe(1);
         expect(seen[1]).toBeGreaterThan(0);
       });
+    }, 60_000);
+  });
+
+  describe('a form that keeps its own state, the way a framework does', () => {
+    // It never reads the DOM at submit: each field reaches its state only
+    // through the input and change events a person's typing, choosing and
+    // uploading fire, and the submit checks that state alone, the file's
+    // bytes included. A fill that set a value without those events would
+    // leave a field empty here while the page shows it full.
+    const FRAMEWORK_FORM = `<!doctype html><html><head><title>Join</title></head><body>
+<form id="f" novalidate>
+<p><label>Email * <input id="email" name="email" type="email" required></label></p>
+<p><label>Country * <select id="country" name="country" required><option value="">Choose</option><option value="US">United States</option><option value="CA">Canada</option></select></label></p>
+<p><label>Date of birth * <input id="dob" name="dob" type="date" required></label></p>
+<fieldset><legend>Contact by *</legend><label><input type="radio" name="contact" value="email"> Email</label><label><input type="radio" name="contact" value="phone"> Phone</label></fieldset>
+<p><label>Profile picture * <input id="pic" name="pic" type="file" accept="image/*" required></label></p>
+<p><button type="submit">Send</button></p>
+</form>
+<p id="out">not sent</p>
+<script>
+var state = {};
+var form = document.getElementById('f');
+['input', 'change'].forEach(function (kind) {
+  form.addEventListener(kind, function (event) {
+    var field = event.target;
+    if (field.type === 'radio') { if (field.checked) state[field.name] = field.value; return; }
+    state[field.name] = field.type === 'file' ? field.files[0] : field.value;
+  });
+});
+form.addEventListener('submit', function (event) {
+  event.preventDefault();
+  var missing = ['email', 'country', 'dob', 'contact', 'pic'].filter(function (name) { return !state[name]; });
+  if (missing.length > 0) { document.getElementById('out').textContent = 'missing ' + missing.join(', '); return; }
+  state.pic.arrayBuffer().then(function (bytes) {
+    var head = Array.from(new Uint8Array(bytes).slice(0, 4)).join(',');
+    document.getElementById('out').textContent =
+      head === '137,80,78,71' ? 'received ' + state.email + ' ' + state.country + ' ' + state.dob + ' ' + state.contact + ' ' + state.pic.name : 'not a picture';
+  });
+});
+</script></body></html>`;
+
+    /** A run's file space on this machine: what `createFile` writes and `attachFile` stages. */
+    function localFiles(): FilePort {
+      const held = new Map<string, { readonly name: string; readonly path: string }>();
+      const directory = mkdtempSync(join(tmpdir(), 'scout-files-'));
+      return {
+        list: () => [...held].map(([fileId, file]) => ({ fileId, name: file.name })),
+        create: ({ name }) => {
+          const fileId = `file_made_${String(held.size + 1)}`;
+          const path = join(directory, name);
+          writeFileSync(path, encodePng({ width: 8, height: 8, rgba: new Uint8Array(8 * 8 * 4).fill(0xe5) }));
+          held.set(fileId, { name, path });
+          return { fileId, name };
+        },
+        stage: async (fileId) => held.get(fileId)?.path,
+      };
+    }
+
+    test('is filled, given a picture the run made and attached by name, and sent', async () => {
+      const page = await chrome.open(`data:text/html,${encodeURIComponent(FRAMEWORK_FORM)}`);
+      const files = localFiles();
+      const deps = bindAgent(page, { model: null, tabs: null, files, hands, flavor: stockFlavor });
+      const find = (tree: AxTree, role: string, name: string): AxNode | undefined =>
+        walk(tree).find((node) => node.role === role && (node.name ?? '').startsWith(name));
+      const plan: readonly ((tree: AxTree) => ModelChoice['action'] | undefined)[] = [
+        (tree) => { const at = find(tree, 'textbox', 'Email'); return at && { type: 'fill', ref: at.ref, text: 'jane.doe@example.com' }; },
+        (tree) => { const at = find(tree, 'combobox', 'Country'); return at && { type: 'select', ref: at.ref, value: 'Canada' }; },
+        (tree) => { const at = walk(tree).find((node) => node.role === 'spinbutton'); return at && { type: 'fill', ref: at.ref, text: '1990-01-15' }; },
+        (tree) => { const at = find(tree, 'radio', 'Email'); return at && { type: 'click', ref: at.ref }; },
+        () => ({ type: 'createFile', file: 'profile.png', text: '' }),
+        (tree) => { const at = find(tree, 'button', 'Profile picture'); return at && { type: 'attachFile', ref: at.ref, file: 'profile.png' }; },
+        (tree) => { const at = find(tree, 'button', 'Send'); return at && { type: 'click', ref: at.ref }; },
+      ];
+      const result = await runAgent(
+        {
+          ...deps,
+          model: (prompt): ModelChoice => ({ action: plan[prompt.step]?.(prompt.tree) ?? { type: 'done', summary: 'sent' } }),
+        },
+        { task: 'Fill in every required field of the join form and submit it.', caps: { steps: 10, budget: '1.00', duration: '1m' }, stepFailures: 0 },
+      );
+
+      expect(result.steps.map((step) => step.error)).toEqual(result.steps.map(() => undefined));
+      expect(await evaluate(page, 'document.getElementById("out").textContent')).toBe(
+        'received jane.doe@example.com CA 1990-01-15 email profile.png',
+      );
     }, 60_000);
   });
 });
