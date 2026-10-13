@@ -11,6 +11,7 @@ export * from './types';
 export * from './decimal';
 export * from './errors';
 export * from './interstitial';
+export * from './pdf-text';
 export * from './rules';
 export * from './secrets';
 export * from './site';

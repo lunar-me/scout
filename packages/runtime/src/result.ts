@@ -702,8 +702,52 @@ export interface StepTrace {
    * the results, trace silent).
    */
   readonly verification?: readonly StepVerification[];
+  /**
+   * THE PAGE AS THE DECIDING MODEL READ IT this step, when a model port
+   * wrote one (`ModelChoice.brief`): the brief's facts and its elements,
+   * each cut at {@link MAX_STEP_BRIEF_CHARS}. Absent on a step no model
+   * decided (a queued step, a cache hit) and from a port that keeps no brief.
+   *
+   * On the step because the brief is chosen from the live tree and stored
+   * nowhere else: every question of the form "did the model see X" needed
+   * the page recaptured, hours later and changed (2026-10-13: a run's
+   * results table, re-read to learn its brief had dropped the rows the task
+   * named). INTERNAL, like {@link modelCostUsd}: {@link toWireStep} never
+   * projects it.
+   */
+  readonly brief?: StepBrief;
   /** Present when the step threw or the model produced an unusable action. */
   readonly error?: string;
+}
+
+/** The brief a model decided a step on: see {@link StepTrace.brief}. */
+export interface StepBrief {
+  readonly facts: string;
+  readonly elements: string;
+}
+
+/**
+ * The most of a brief's facts and elements a step keeps. Above the brain's
+ * own budgets (facts 2,700 on a list page, elements 900) with room for the
+ * reads and notices beside them, so a brief is kept whole.
+ */
+export const MAX_STEP_BRIEF_CHARS = Object.freeze({ facts: 4_000, elements: 1_500 });
+
+/**
+ * A stored step body as a CUSTOMER may read it: without the fields kept for
+ * the host alone. `modelCostUsd` states the markup beside `spent` (owner
+ * decision W44, 2026-09-25); `brief` is the deciding model's view, kept so a
+ * run can be explained from its record. The stored body keeps both: a
+ * resume reads `modelCostUsd` back, and an investigation reads `brief`.
+ * Every customer read of a step record goes through this: the events route,
+ * the SDKs, the webhook and the live run socket.
+ */
+export function customerStepBody(body: unknown): unknown {
+  if (typeof body !== 'object' || body === null || !('modelCostUsd' in body || 'brief' in body)) {
+    return body;
+  }
+  const { modelCostUsd: _cost, brief: _brief, ...visible } = body as Record<string, unknown>;
+  return visible;
 }
 
 /** The most of a tool's note a step keeps. A `page.verify` answer is one sentence plus up to three attempt lines. */

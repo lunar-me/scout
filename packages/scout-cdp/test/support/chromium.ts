@@ -148,10 +148,18 @@ export interface StockChromium {
   close(): Promise<void>;
 }
 
-/** Launches the stock Chromium headless with a debugging port. Callers must `close()` it. */
-export async function launchChromium(): Promise<StockChromium> {
+/**
+ * Launches the stock Chromium headless with a debugging port. Callers must
+ * `close()` it. `pdfViewer` launches the full browser in its new headless mode
+ * instead of the headless shell, which has no PDF viewer and downloads a PDF.
+ */
+export async function launchChromium(options: { readonly pdfViewer?: boolean } = {}): Promise<StockChromium> {
   const port = await freePort();
-  const browser: Browser = await chromium.launch({ headless: true, args: [`--remote-debugging-port=${String(port)}`, '--site-per-process'] });
+  const browser: Browser = await chromium.launch({
+    headless: true,
+    ...(options.pdfViewer === true ? { channel: 'chromium' } : {}),
+    args: [`--remote-debugging-port=${String(port)}`, '--site-per-process'],
+  });
   try {
     const version = (await (await fetch(`http://127.0.0.1:${String(port)}/json/version`)).json()) as { webSocketDebuggerUrl: string };
     const connection = await CdpConnection.open(version.webSocketDebuggerUrl);

@@ -39,7 +39,7 @@
  * {@link WrongTabRefError} for why that refusal names the tab.
  */
 import { DEFAULT_MIN_TEXT_LENGTH, isRecord, optionAliases, systemClock, type JsonSchema } from '@outcrawl/scout-core';
-import { MAX_DRAG_PX, MIN_DRAG_PX, filterTree, findNode, formatNodeRef, framedInstruction, heldPrivately, isReloadKey, isViewportPoint, nativeDateKeys, nativeDateKind, nativeDateRuns, nativeDateValue, nodeRef, walk, type Action, type AgentDeps, type AgentPrompt, type AxNode, type AxTree, type DragAction, type DragEnd, type ExtractBound, type ExtractOutcome, type ExtractSelection, type LookCamera, type LookShot, type NativeDateKind, type RefusedSubmit, type ModelChoice, type NodeRef, type PerformOutcome, type SiteCheckResult, type SiteCheckSighting, type TextCaptchaSighting, type ViewportPoint } from '@outcrawl/runtime';
+import { MAX_DRAG_PX, MIN_DRAG_PX, filterTree, findNode, formatNodeRef, framedInstruction, heldPrivately, isReloadKey, isViewportPoint, nativeDateKeys, nativeDateKind, nativeDateRuns, nativeDateValue, nodeRef, walk, type Action, type AgentDeps, type AgentPrompt, type AxNode, type AxTree, type DragAction, type DragEnd, type ExtractBound, type ExtractContent, type ExtractOutcome, type ExtractSelection, type LookCamera, type LookShot, type NativeDateKind, type RefusedSubmit, type ModelChoice, type NodeRef, type PerformOutcome, type SiteCheckResult, type SiteCheckSighting, type TextCaptchaSighting, type ViewportPoint } from '@outcrawl/runtime';
 import { axTreeFromCdp, frameOrdinalsOf } from './ax-tree';
 import { isCdpTimeout, type CdpPage } from './cdp';
 import { readDocument } from './document';
@@ -56,6 +56,7 @@ import { DEFAULT_LOCK_TIMEOUT_MS, ERROR_PAGE_PREFIX, FREEZE_REPLY_DEADLINE_MS, F
 import type { HandsContext, HandsPort, HandsStep, HandsTarget, PointerSample } from './hands';
 import { selfReleases, sendUntilForwarded } from './input';
 import { asksForDestination, withLinkHrefs } from './link-hrefs';
+import { pdfDocuments, pdfMarkdown, pdfNotice } from './pdf-document';
 import { HIT_SAMPLES, HIT_WINDOW_PX, LANDING_DRAWS, LIST_OPTION_POLL_MS, LIST_OPTION_ROLES, LIST_OPTION_WAIT_MS, LIST_SELECT_SETTLE_MS, MAX_REACH_GESTURE_PX, MAX_REACH_TOTAL_PX, MAX_SCROLLS_TO_REACH, MIN_HITTABLE_PX, PAINTED_DESCENDANT_DEPTH, PAINTED_DESCENDANT_READS, PAINTED_RUN_STEPS, POINT_AIM_PX, REST_EPSILON_PX, SCROLL_PROGRESS_PX, SCROLL_REST_POLL_MS, SCROLL_REST_TIMEOUT_MS, TYPED_LIST_ROLES, normalisedName, textOutsideLists } from './reach';
 import { CLIPPING_SCROLLER, DISMISS_NAME, FILE_INPUT_NEAR, FIXED_OF, FOCUS_TAKES_TEXT, LABELLED_CONTROL_TYPES, MAX_DISMISS_CHECKS, MAX_DISMISS_NAMED, MAX_MIXED_LABEL_READS, MAX_NATIVE_DATE_READS, MODAL_OF, NATIVE_DATE_HOST, NATIVE_DATE_LAYOUT, SAME_CONTROL, SELECT_OF, asShown, clipFrom, nativeSelect, refusedSubmit } from './scripts';
 
@@ -301,6 +302,9 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
       mainNavigation = undefined;
     }
   });
+
+  /** The PDF this tab is showing, when it shows one: see `./pdf-document.ts`. */
+  const pdf = pdfDocuments(page);
 
   /**
    * THE NAVIGATION THIS TAB WAS LEFT TO LOAD, and how many freeze holds have
@@ -1162,8 +1166,28 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
     const resolved = await withNativeDateFields(await withRadioLabelsResolved(tree));
     const shown = parked.size === 0 && covered.size === 0 ? resolved : await withoutParked(resolved);
     if (!conceal) return shown;
+    // Before the mask, so a secret the PDF's title might hold is concealed too.
+    const noted = await withPdfNotice(shown);
     const mask = tab?.masking?.tree;
-    return mask === undefined ? shown : await mask(shown);
+    return mask === undefined ? noted : await mask(noted);
+  }
+
+  /**
+   * `tree` with one line saying the tab shows a PDF and that `extract` reads
+   * its text, as the root's first child, when the top document is a PDF.
+   *
+   * The tree of a PDF tab is the viewer's toolbar (`./pdf-document.ts`), and a
+   * model shown only that concludes there is nothing to read: in one
+   * production run (2026-10-13) the model said "the accessibility tree shows
+   * only a sidebar toggle button" and never ran `extract` on the PDF it had
+   * open at any of 14 decisions. The line carries the root's ref: it is text,
+   * not a control, and names no element of its own.
+   */
+  async function withPdfNotice(tree: AxTree): Promise<AxTree> {
+    const shown = await pdf.peek();
+    if (shown === undefined) return tree;
+    const notice: AxNode = { ref: tree.root.ref, role: 'StaticText', name: pdfNotice(shown.read), xpath: '' };
+    return { ...tree, root: { ...tree.root, children: [notice, ...(tree.root.children ?? [])] } };
   }
 
   /**
@@ -3757,22 +3781,34 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
       if (model === null) {
         throw hooks.modelUnavailable?.('extract') ?? new NoModelError('extract');
       }
-      // Where links go, only when this extraction asks for a destination: see
-      // `./link-hrefs.ts` for what that costs and why the page cannot see it
-      // being read. `snapshot()` has already concealed the tree, and a second
-      // `concealTree` would rewrite its placeholders, so only the added
-      // destinations are concealed.
-      const shown = await snapshot();
       const conceal = tab?.masking?.conceal;
-      const tree = asksForDestination(instruction, schema)
-        ? await withLinkHrefs(shown, {
-            owner: sessionFor,
-            top: page,
-            axTree: (session) => flavor.axTree(session, { maxNodes: SNAPSHOT_MAX_NODES }),
-            conceal: (text) => (conceal === undefined ? text : conceal(text)),
-            clock,
-          })
-        : shown;
+      const concealed = (text: string): string => (conceal === undefined ? text : conceal(text));
+      // A tab showing a PDF is read from the PDF's own text, not from its
+      // tree, which is the viewer's toolbar: see `./pdf-document.ts`. One that
+      // cannot be read (no copy kept, encrypted, a scan) falls through to the
+      // tree, whose first line says why.
+      const document = await pdf.read();
+      let content: ExtractContent;
+      if (document?.outcome === 'read') {
+        content = { kind: 'markdown', markdown: concealed(pdfMarkdown(document)) };
+      } else {
+        // Where links go, only when this extraction asks for a destination: see
+        // `./link-hrefs.ts` for what that costs and why the page cannot see it
+        // being read. `snapshot()` has already concealed the tree, and a second
+        // `concealTree` would rewrite its placeholders, so only the added
+        // destinations are concealed.
+        const shown = await snapshot();
+        const tree = asksForDestination(instruction, schema)
+          ? await withLinkHrefs(shown, {
+              owner: sessionFor,
+              top: page,
+              axTree: (session) => flavor.axTree(session, { maxNodes: SNAPSHOT_MAX_NODES }),
+              conceal: concealed,
+              clock,
+            })
+          : shown;
+        content = { kind: 'tree', tree };
+      }
       // Every field named, none spread conditionally. `ExtractInput` is
       // required-and-nullable throughout precisely because this call used to
       // omit `markdown` while the client read only `markdown`: the model was
@@ -3785,7 +3821,7 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
       const output = await model.extract({
         instruction: framedInstruction(instruction, framing) ?? null,
         schema: schema ?? null,
-        content: { kind: 'tree', tree },
+        content,
         ...(selection === undefined ? {} : { selection }),
         // What this extraction may spend (OC-284). The client cuts a page over
         // it and says so; the cut comes back on `cut` for the step record.

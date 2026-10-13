@@ -126,6 +126,7 @@ import type {
   ExtractOutcome,
   ModelChoice,
   ModelPort,
+  StepBrief,
   StepTrace,
 } from '@outcrawl/runtime';
 
@@ -1140,6 +1141,8 @@ export class HarnessModelPort implements ModelPort {
   #tail = '';
   /** Every element list the brain was shown this run: they ride outside the thread, so the trace keeps them. */
   readonly #tails: string[] = [];
+  /** The brief the brain decided this step on, for the step record (`ModelChoice.brief`); unset on a queued step. */
+  #stepBrief: StepBrief | undefined;
   /** The trace's own refusals: they quote the untraced names, so they are not what the brain was shown. */
   readonly #untraced: string[] = [];
   /** Why the brain's last done was turned into a read, told to it next turn. */
@@ -1251,11 +1254,14 @@ export class HarnessModelPort implements ModelPort {
    */
   readonly choose = async (prompt: AgentPrompt): Promise<ModelChoice> => {
     if (this.#brain !== undefined) {
+      this.#stepBrief = undefined;
       const choice = await this.#brainStep(this.#brain, prompt);
+      const brief = this.#stepBrief;
       // A reload chosen as a key press runs as the navigate it means (see
       // `reloadAsNavigate`): brain mode only, where the decision is ours.
       const reload = reloadAsNavigate(choice.action, prompt.tree.url);
-      return reload === undefined ? choice : { ...choice, action: reload };
+      const chosen = reload === undefined ? choice : { ...choice, action: reload };
+      return brief === undefined ? chosen : { ...chosen, brief };
     }
     const planner = this.#planner;
     const spent: { readonly usage?: Usage }[] = [];
@@ -1414,6 +1420,10 @@ export class HarnessModelPort implements ModelPort {
     const kept = `${brain.thread.step(prompt, expected, warnings, this.#fullReads)}\n${sameFacts ? 'Page and facts: unchanged since your last turn.' : facts}${qualifying === undefined ? '' : `\n${qualifying}`}`;
     this.#tail = briefElements(prompt.tree, brief);
     this.#tails.push(this.#tail);
+    // The page as the brain read it, whole, for the step record: never the
+    // "unchanged" line the thread got instead, so one record answers what it
+    // was shown.
+    this.#stepBrief = { facts, elements: this.#tail };
     const first = await this.#decide(brain, prompt.step, kept, this.#tail, spent);
     // Held only once the thread committed the turn that carried them.
     if (first !== undefined) {

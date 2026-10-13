@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
 import type { Clock } from '@outcrawl/scout-core';
-import { hashSnapshot, nodeRef, renderPrompt, type AgentPrompt, type AxTree, type StepTrace } from '@outcrawl/runtime';
+import { hashSnapshot, nodeRef, renderPrompt, type AgentPrompt, type AxNode, type AxTree, type StepTrace } from '@outcrawl/runtime';
 
 import { BRAIN_BUDGET, BRAIN_SCHEMA, BRAIN_SYSTEM_PROMPT, BrainThread, actionKey, repeatedActions, retryableNavigations, alreadyRead, reloadAsNavigate, briefElements, briefFacts, rankedReadGap, rawBrief, readBrief, reconciledNavigate, redirectedSite, searchedBefore, selectBrief as selectBriefWithRefs, directAction, threadReply, unconfirmedSlot, wholeRead, wrongListItem, readWithConditions, comboboxMiss, factsBesideReads, listingVerdicts } from '../src/brain';
 import { HarnessModelPort, type ModelPlan } from '../src/harness';
@@ -110,6 +110,24 @@ describe('a brain step', () => {
     expect(brainAsked?.providerOrder).toEqual(['provider-a']);
     expect(provider.requests[0]?.providerOrder).toBeUndefined();
     expect(ledger.totalsFor('sess_brain').costUsd).toBe('0.0021');
+  });
+
+  /**
+   * MUTATIONS THIS CATCHES: a decided step's choice without the brief the
+   * brain read (the step record keeps it), and a page the thread already
+   * holds recorded as the "unchanged" line instead of what was on it.
+   */
+  test('each decided step carries the brief the brain read, whole even when the thread was told it is unchanged', async () => {
+    const provider = new FakeProvider([eyes(), brain({ do: 'act', a: { type: 'scroll', dy: 300 } }), eyes(), brain({ do: 'act', a: { type: 'click', ref: '0-11' } })]);
+    const { port } = brainPort(provider);
+    const first = await port.choose(promptFor(TREE));
+    const second = await port.choose(promptFor(TREE, 'check out', 1, [trace(0, hashSnapshot(TREE), { action: { type: 'scroll', dy: 300 } })]));
+
+    expect(provider.requests[3]?.prompt).toContain('Page and facts: unchanged since your last turn.');
+    for (const choice of [first, second]) {
+      expect(choice.brief?.facts).toContain('Total: $12.00');
+      expect(choice.brief?.elements).toContain('[0-11] button "Checkout"');
+    }
   });
 
   test('a ref the eyes did not list is grounded by the hands on the full prompt', async () => {
@@ -1267,6 +1285,81 @@ describe('a big page can be chosen by rule instead of by the eyes', () => {
     ]);
     const facts = selectBrief(cards(listings), 'Find the cheapest 3-seat sofa no wider than 200 cm.').facts;
     expect(facts.some((fact) => fact.includes('SF-221'))).toBe(true);
+  });
+
+  /**
+   * MUTATIONS THIS CATCHES: a table's rows not counted as listings because
+   * their names are two words (the brief said "All 15 listings shown" of a
+   * 50-row page and left out the rows the task named), and a plural task
+   * word ("maples") not matching its singular on the page.
+   */
+  test('every row of a flat table is a listing, the count is the rows the page holds, and the rows the task names are shown', () => {
+    const genera = ['Quercus', 'Pinus', 'Betula', 'Fraxinus', 'Ulmus', 'Tilia', 'Salix', 'Populus', 'Alnus', 'Carpinus'];
+    const maples: Readonly<Record<number, readonly [string, string]>> = { 30: ['Acer rubrum', 'Red maple'], 31: ['Acer saccharum', 'Sugar maple'], 32: ['Acer saccharinum', 'Silver maple'] };
+    let id = 100;
+    const cell = (name: string): AxNode => node({ role: 'StaticText', name, xpath: '', backendNodeId: id++ });
+    const link = (name: string): AxNode => node({ role: 'link', name, xpath: `/a${String(id)}`, backendNodeId: id++ });
+    const rows = Array.from({ length: 50 }, (_, i) => {
+      // Every seventh row a three-word name, the kind counted before; rows 12 and 37 with no link of their own.
+      const [scientific, common] = maples[i] ?? [i % 7 === 0 ? `${genera[i % 10]!} species var${String(i)} minor` : `${genera[i % 10]!} species${String(i)}`, `Common tree ${String(i)}`];
+      return [
+        ...(i === 12 || i === 37 ? [] : [link(scientific)]),
+        cell('Plants-Trees'),
+        cell(scientific),
+        cell(common),
+        link('Details'),
+        link('Range map'),
+        cell(i % 3 === 0 ? 'Introduced' : 'Native'),
+      ];
+    }).flat();
+    const tree: AxTree = {
+      url: 'https://flora.example.org/list?group=trees',
+      root: node({ role: 'RootWebArea', name: 'Tree checklist', xpath: '/html', backendNodeId: 1, children: [cell('Total records: 50'), link('Scientific Name'), link('Common Name'), ...rows] }),
+    };
+    const facts = selectBrief(tree, 'Which maples on the checklist are introduced?').facts;
+    expect(facts[0]).toMatch(/^\d+ of 48 listings shown/u);
+    expect(facts.some((fact) => /\b50 rows\b/u.test(fact))).toBe(true);
+    for (const [scientific, common] of Object.values(maples)) {
+      expect(facts).toContain(`link "${scientific}"`);
+      expect(facts).toContain(common);
+    }
+  });
+
+  /**
+   * MUTATIONS THIS CATCHES: a search page's URL breadcrumbs (links holding
+   * their own text) taken for its listings with the result titles left out,
+   * snippets dropped as too long for an attribute or shown as the pieces a
+   * search engine splits them into, and an AI summary above the results
+   * filling the brief before them.
+   */
+  test('a search page lists every result title with its snippet, before its summary block and breadcrumbs', () => {
+    let id = 100;
+    const text = (name: string): AxNode => node({ role: 'StaticText', name, xpath: '', backendNodeId: id++ });
+    const summary = Array.from({ length: 30 }, (_, i) => text(`Lighthouse keepers in the harbour logged weather and ships, note ${String(i)} of the summary.`));
+    const results = Array.from({ length: 10 }, (_, i) => {
+      const site = `site${String(i)}.example`;
+      const title = `Harbour lighthouse history, part ${String(i)}: keepers and logbooks`;
+      return [
+        node({ role: 'link', name: `Search domain ${site}`, xpath: `/d${String(i)}`, backendNodeId: id++ }),
+        text(`Site ${String(i)}`),
+        node({ role: 'link', name: `https://${site} › history › lighthouse`, xpath: `/b${String(i)}`, backendNodeId: id++, children: [text('https://'), text(site), text(' › '), text('history › lighthouse')] }),
+        node({ role: 'heading', name: title, xpath: '', backendNodeId: id++, children: [node({ role: 'link', name: title, xpath: `/t${String(i)}`, backendNodeId: id++ })] }),
+        text('The'),
+        text('lighthouse'),
+        text(`at the harbour mouth, result ${String(i)}, kept logbooks of every ship and storm for a century.`),
+      ];
+    }).flat();
+    const tree: AxTree = {
+      url: 'https://search.example.com/?q=harbour+lighthouse+keepers',
+      root: node({ role: 'RootWebArea', name: 'harbour lighthouse keepers at Search', xpath: '/html', backendNodeId: 1, children: [node({ role: 'heading', name: 'AI summary', xpath: '', backendNodeId: 2 }), ...summary, ...results] }),
+    };
+    const brief = selectBrief(tree, 'Who kept the harbour lighthouse logbooks?');
+    expect(brief.facts[0]).toBe('All 10 listings shown.');
+    for (let i = 0; i < 10; i += 1) {
+      expect(brief.facts).toContain(`link "Harbour lighthouse history, part ${String(i)}: keepers and logbooks"`);
+      expect(brief.facts).toContain(`The lighthouse at the harbour mouth, result ${String(i)}, kept logbooks of every ship and storm for a century.`);
+    }
+    expect(briefFacts(brief, undefined).length).toBeLessThanOrEqual(brief.factsChars ?? BRAIN_BUDGET.facts);
   });
 
   /** MUTATION THIS CATCHES: a refused click run again as Enter on the same element (L1). */

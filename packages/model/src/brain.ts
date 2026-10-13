@@ -463,8 +463,10 @@ export function selectBrief(tree: AxTree, task: string, today?: string): Brief {
   const scan = scanPage(tree);
   // Matched on a light stem, so "open" finds "opened" and "price" finds
   // "prices" (dev2 X4: the line saying when the museum "opened" scored as if
-  // it had nothing to do with when it "open[ed] to the public").
-  const stem = (word: string): string => (word.length > 4 ? word.replace(/(?:ing|ed|es|s)$/u, '') : word);
+  // it had nothing to do with when it "open[ed] to the public"). A final
+  // "e" goes too: kept, "maples" (mapl) never found "maple",
+  // and the rows a task named ranked with the rest (2026-10-13 recapture).
+  const stem = (word: string): string => (word.length > 4 ? word.replace(/(?:ing|ed|es|e|s)$/u, '') : word);
   const words = new Set(
     wholeNumbers(task)
       .toLowerCase()
@@ -627,8 +629,10 @@ export function selectBrief(tree: AxTree, task: string, today?: string): Brief {
   // paged or read them (tainted sealed items via Main, 2026-10-05: a frontier model 8/8
   // misses on the same briefs).
   const titleFails = new Map<number, string>();
+  // A search result's snippet, said on its first line (see `ListItem.summary`).
+  const summaries = new Map<number, string>();
   const display = (order: number): string => {
-    const line = shortened.get(order) ?? scan.text[order]!;
+    const line = shortened.get(order) ?? summaries.get(order) ?? scan.text[order]!;
     const ref = titleRefs.get(order);
     const fails = titleFails.get(order);
     return `${ref === undefined ? line : `${line} [${ref}]`}${titleChips.get(order) ?? ''}${fails === undefined ? '' : ` (${fails})`}`;
@@ -759,6 +763,7 @@ export function selectBrief(tree: AxTree, task: string, today?: string): Brief {
   // page" under the next title).
   for (const item of items) titleRefs.set(item.title, refText(item.titleNode));
   for (const item of items) if (item.chips.length > 0) titleChips.set(item.title, `, tagged ${item.chips.map((chip) => JSON.stringify(chip)).join(', ')}`);
+  for (const item of items) if (item.summary !== undefined) summaries.set(item.summary.line, item.summary.text);
   // The task's words for the conditions a listing fails: its failed bounds
   // as the task states them, its denied words as a run of the task's own.
   const taskTokens = [...task.matchAll(/[\p{L}\p{N}$]+/gu)].map((match) => ({ word: match[0].toLowerCase(), stem: stem(match[0].toLowerCase()), start: match.index ?? 0, end: (match.index ?? 0) + match[0].length }));
@@ -802,6 +807,12 @@ export function selectBrief(tree: AxTree, task: string, today?: string): Brief {
     ),
   ].slice(0, 2);
   const shared = sharedLines.length === 0 ? [] : [`Every listing: ${sharedLines.map((line) => JSON.stringify(clip(line, 50))).join(', ')}`];
+  // A page of records whose every listing is a record says how many records
+  // it holds: one with no link of its own is no listing, and the count
+  // would leave it out unsaid (2 of the 50 rows on a table recaptured
+  // 2026-10-13).
+  const unlinked = items.length > 0 && items.every((item) => scan.rows.has(item.titleNode)) ? scan.records - items.length : 0;
+  const records = unlinked > 0 ? [`The page holds ${String(scan.records)} rows; ${String(unlinked)} of them are not among the listings counted.`] : [];
   // Never more than was checked: a listing not shown that fails nothing the
   // matcher read, but states no figure for a bound or no word either way
   // for a condition some listing states, is "not checked", not "ranks
@@ -836,7 +847,7 @@ export function selectBrief(tree: AxTree, task: string, today?: string): Brief {
     factsChars = LIST_FACTS;
     textBudget = factsChars - 8 - pageHead.length;
   }
-  if (items.length > 0) textBudget -= [listNote(items.length - 10, 3, 3), ...shared].reduce((sum, line) => sum + Math.min(line.length, FACT_CHARS) + 3, 0);
+  if (items.length > 0) textBudget -= [listNote(items.length - 10, 3, 3), ...records, ...shared].reduce((sum, line) => sum + Math.min(line.length, FACT_CHARS) + 3, 0);
   const inItem = new Set(items.flatMap((item) => [item.title, ...item.span]));
   itemLines = inItem;
   type Pick = {
@@ -873,9 +884,13 @@ export function selectBrief(tree: AxTree, task: string, today?: string): Brief {
     // item's attributes: its title is less use than the values of one that
     // may qualify.
     ...byMatch.map((item, index) =>
-      item.fails
-        ? { score: restScore - 0.1, order: item.title, orders: reducedHead(item), seq: index, part: 'failing' as const }
-        : { score: itemScore[index]!, order: item.title, orders: reducedHead(item), seq: index, part: 'head' as const },
+      // A search result shows whatever it fails: the engine ranked it, and
+      // its title and snippet are what the brain chooses a page by.
+      item.summary !== undefined
+        ? { score: RESULT_FIRST + (item.fails ? restScore - 0.1 : itemScore[index]!), order: item.title, orders: reducedHead(item), seq: index, part: 'head' as const }
+        : item.fails
+          ? { score: restScore - 0.1, order: item.title, orders: reducedHead(item), seq: index, part: 'failing' as const }
+          : { score: itemScore[index]!, order: item.title, orders: reducedHead(item), seq: index, part: 'head' as const },
     ),
     ...byMatch.map((item, index) => ({ score: restScore + 0.05, order: item.title, orders: head(item), seq: index, part: 'whole' as const })),
     ...byMatch.map((item, index) => ({ score: restScore - 0.25, order: item.title, orders: item.lines.filter((order) => !shownWith(item).has(order)), seq: index, part: 'rest' as const })),
@@ -1023,7 +1038,7 @@ export function selectBrief(tree: AxTree, task: string, today?: string): Brief {
   const elements: BriefElement[] = [];
   let used = 40;
   const nodeRank = byMatch.map((item) => Math.max(...[item.titleNode, ...item.nodes].map((node) => scoreOf.get(node) ?? 0)));
-  const nodeHeadScore = byMatch.map((item, index) => (item === best ? Number.POSITIVE_INFINITY : bonus(item) + Math.max(...nodeRank.slice(index))));
+  const nodeHeadScore = byMatch.map((item, index) => (item === best ? Number.POSITIVE_INFINITY : bonus(item) + Math.max(...nodeRank.slice(index)) + (item.summary === undefined ? 0 : RESULT_FIRST)));
   const nodeHead = (item: ListItem): readonly AxNode[] => [item.titleNode, ...item.nodes];
   type Group = { readonly nodes: readonly AxNode[]; readonly score: number; readonly order: number; readonly seq?: number; readonly item?: boolean };
   const groups: Group[] = [
@@ -1070,6 +1085,7 @@ export function selectBrief(tree: AxTree, task: string, today?: string): Brief {
             hiddenItems.filter((item) => item.fails).length,
             hiddenItems.filter(unchecked).length,
           ),
+          ...records,
           ...shared,
         ].map((text) => ({ text }));
   let next = 0;
@@ -1111,6 +1127,13 @@ const ORDINAL_LINE = /^\d{1,4}\.$/;
  * and the brain re-sorted, 1/5; with this rank, 5/5).
  */
 const ITEM_BONUS = 3;
+/**
+ * A search result's head ranks above every line and control outside the
+ * results: AI-summary lines, breadcrumbs and chrome come after the
+ * results' titles and snippets (33% of titles were in the brief on SERPs
+ * over 6.5k characters, 2026-10-13 recapture).
+ */
+const RESULT_FIRST = 1_000;
 /** Units an item may span after its title. */
 const ITEM_SPAN = 16;
 /**
@@ -1752,6 +1775,25 @@ interface ListItem {
    * only). Said with its title (see `selectBrief`).
    */
   readonly chips: readonly string[];
+  /**
+   * A search result's (see `listItems`): the text under its title, its
+   * snippet, as one line shown on the first of the lines it joins.
+   */
+  readonly summary?: { readonly line: number; readonly text: string };
+}
+
+/** A result's snippet as the brief shows it: about two sentences. */
+const SUMMARY_CHARS = 150;
+
+/**
+ * Text lines run together as one: a snippet the page splits at every word
+ * it bolds ("Find the", "lighthouse", "logbook here.") reads as the sentence it is.
+ */
+function joinedText(lines: readonly string[]): string {
+  return lines
+    .reduce((joined, line) => (joined === '' ? line : /^[,.;:!?)\]…]/u.test(line) ? `${joined}${line}` : `${joined} ${line}`), '')
+    .replace(/\s+/gu, ' ')
+    .trim();
 }
 
 /**
@@ -1782,7 +1824,7 @@ function listItems(scan: ReturnType<typeof scanPage>, score: (line: number) => n
     if (
       unit.node?.role === 'link' &&
       unit.node.name !== undefined &&
-      namesThing(unit.node.name) &&
+      (namesThing(unit.node.name) || scan.rows.has(unit.node)) &&
       // A short card name can carry its price ("Honda Civic 1.8 i-VTEC ES 5dr, £2,395").
       (scan.cards.has(unit.node) || (!isValueLabel(unit.node.name) && !PRICE_RANGE.test(unit.node.name.trim()))) &&
       echo !== undefined &&
@@ -1796,13 +1838,34 @@ function listItems(scan: ReturnType<typeof scanPage>, score: (line: number) => n
   const named = new Map<string, number>();
   for (const title of candidates) named.set(title.node.name ?? '', (named.get(title.node.name ?? '') ?? 0) + 1);
   const unique = candidates.filter((title) => named.get(title.node.name ?? '') === 1);
+  // Titles by their name alone: a record's short-named link is a title only
+  // as one of its page's records (below).
+  const titled = unique.filter((title) => namesThing(title.node.name ?? ''));
   // A title that is also a heading is a card's title for certain: where a
   // page marks three or more that way, its other links are badges, filters
   // and navigation ("Limited time deal" between a title and its price).
-  const strong = unique.filter(
+  const strong = titled.filter(
     (title) => scan.cards.has(title.node) || (scan.headings.has(title.line + 1) && (text[title.line + 1] ?? '').startsWith((title.node.name ?? '').slice(0, 40))),
   );
-  const titles = strong.length >= 3 ? strong : unique;
+  // A SEARCH RESULT's title, on a search page, is a heading whose one
+  // content is its link (on Bing and DuckDuckGo alike): where three or
+  // more are, they are the listings, and the site and URL-breadcrumb links
+  // between them are not.
+  // Taken as cards, the breadcrumbs were the listings and 0 of 10 titles
+  // were shown (DuckDuckGo recapture, 2026-10-13; 67% of titles over 37
+  // SERPs). Only on a search page: an article's "related" headings are no
+  // results to put before its own text. Two results may share a title.
+  const results = RESULTS_URL.test(scan.url)
+    ? candidates.filter((title) => namesThing(title.node.name ?? '') && scan.headings.has(title.line - 1) && (text[title.line - 1] ?? '').startsWith((title.node.name ?? '').slice(0, 40)))
+    : [];
+  // A RECORD's own link on a page of records (`rowLeads`): every row of a
+  // table is a listing, not only those whose name runs to three words.
+  // Where the records are fewer than the titles named the usual way, they
+  // are a side table, not the page's list.
+  const rows = unique.filter((title) => scan.rows.has(title.node));
+  const usual = strong.length >= 3 ? strong : titled;
+  const titles = results.length >= 3 ? results : rows.length >= 3 && rows.length > usual.length ? rows : usual;
+  const resultPage = titles === results;
   const starts = titles.map((title) => {
     for (let at = title.at - 1; at >= Math.max(0, title.at - 3); at -= 1) {
       const line = units[at]?.text;
@@ -1813,13 +1876,21 @@ function listItems(scan: ReturnType<typeof scanPage>, score: (line: number) => n
   const spans = titles.map((title, index) => {
     const lines: number[] = [];
     const nodes: AxNode[] = [];
+    // The title link's own words: on a search result, its pieces ("Harbour",
+    // "lighthouse", " history"), the title again.
+    const own: number[] = [];
     const name = (title.node.name ?? '').slice(0, 40);
-    const stop = Math.min(starts[index + 1] ?? units.length, title.at + ITEM_SPAN);
+    // A result ends at the next control (below), however many pieces its
+    // title and snippet are split into.
+    const stop = Math.min(starts[index + 1] ?? units.length, resultPage ? units.length : title.at + ITEM_SPAN);
     for (let at = starts[index]!; at < stop; at += 1) {
       const unit = units[at]!;
       if (unit.node !== undefined) {
         const label = unit.node.name ?? '';
         if (FIELD_ROLES.has(unit.node.role) || PAGING.test(label.trim())) break;
+        // A result is its title and the text under it: the next control
+        // (a sitelink, the next result's site and breadcrumb) is not its.
+        if (resultPage && unit.node !== title.node) break;
         nodes.push(unit.node);
       } else if (unit.text !== undefined) {
         const line = text[unit.text] ?? '';
@@ -1827,9 +1898,10 @@ function listItems(scan: ReturnType<typeof scanPage>, score: (line: number) => n
         // The title's own words are the title, not a field of it.
         // Except a whole card's: those are its fields (`cardOf`).
         if (unit.owner !== title.node || scan.cards.has(title.node)) lines.push(unit.text);
+        else own.push(unit.text);
       }
     }
-    return { title, lines, nodes, name };
+    return { title, lines, nodes, name, own };
   });
   const seen = new Map<string, number>();
   for (const span of spans) {
@@ -1843,7 +1915,7 @@ function listItems(scan: ReturnType<typeof scanPage>, score: (line: number) => n
   // one, every item: four of five saying "tier 1" still tells the fifth apart.
   const universal = (order: number): boolean =>
     (seen.get(text[order] ?? '') ?? 0) >= Math.max(TEMPLATE_ITEMS, withLines >= 8 ? Math.ceil(withLines * 0.8) : withLines);
-  const items = spans.map(({ title, lines, nodes, name }): ListItem => {
+  const items = spans.map(({ title, lines, nodes, name, own }): ListItem => {
     // A line naming the task's terms ("No pets allowed", "Ribeira") or
     // meeting its price ceiling is a constraint value: it goes with its
     // title however long or however often it recurs.
@@ -1962,7 +2034,7 @@ function listItems(scan: ReturnType<typeof scanPage>, score: (line: number) => n
     const fields = [...new Set([...matching, ...attributes, ...[...new Set([...ordinal, ...below, ...valueLines, ...rest])].filter((order) => !matching.includes(order)).slice(0, ITEM_FIELDS)])].sort(
       (left, right) => left - right,
     );
-    return {
+    const item: ListItem = {
       title: title.line,
       titleNode: title.node,
       rank: Math.max(score(title.line), ...fields.map(score)),
@@ -1991,6 +2063,14 @@ function listItems(scan: ReturnType<typeof scanPage>, score: (line: number) => n
       nodes: values,
       chips,
     };
+    const snippet = lines.filter((order) => order !== title.line);
+    if (!resultPage || snippet.length === 0) return item;
+    // A result shows its title and its snippet before any result shows
+    // more: the snippet's lines as one, never cut to an attribute's length
+    // (57% of snippets were in the brief over 37 SERPs, 2026-10-13). Its
+    // heading line says the title again: it is the item's, and not shown.
+    const summary = { line: snippet[0]!, text: clip(joinedText(snippet.map((order) => text[order] ?? '')), SUMMARY_CHARS) };
+    return { ...item, attributes: [summary.line], headLines: [summary.line], deciding: [summary.line], span: [title.line - 1, ...own, ...lines], lines: [summary.line], summary };
   });
   // A title with no field is a link like any other (navigation, a filter).
   const fielded = items.filter((item) => item.lines.length > 0);
@@ -2030,6 +2110,11 @@ function scanPage(tree: AxTree): {
   readonly headings: ReadonlySet<number>;
   /** Whole-card links: see `cardOf`. */
   readonly cards: ReadonlySet<AxNode>;
+  /** Each record's own link on a page of repeated records, and how many records it holds: see `rowLeads`. */
+  readonly rows: ReadonlySet<AxNode>;
+  readonly records: number;
+  /** The page's URL. */
+  readonly url: string;
   /** A link line's whole text where the line clips it (a card's full title, a long link name). */
   readonly fullText: ReadonlyMap<number, string>;
   /** A text line was longer than {@link TEXT_LINE_CHARS} and was cut. */
@@ -2048,6 +2133,7 @@ function scanPage(tree: AxTree): {
   /** A card's title text, said by its link line instead. */
   const skip = new Set<AxNode>();
   let owner: AxNode | undefined;
+  const { leads: rows, records } = rowLeads(tree);
   const line = (value: string): void => {
     units.push({ text: text.length, ...(owner === undefined ? {} : { owner }) });
     text.push(value);
@@ -2079,7 +2165,10 @@ function scanPage(tree: AxTree): {
       // with nothing after it, so the brain re-read the page for an answer it
       // was already shown (dev2 Y10, 2026-10-03 00:41Z).
       const value = node.name !== undefined && isValueLabel(node.name);
-      const card = node.role === 'link' && parent !== undefined ? cardOf(node) : undefined;
+      // A heading's link is a title, however its words are split ("Harbour",
+      // "lighthouse", " history" where a search engine bolds the query): as
+      // a card its title was its first piece (Bing recapture, 2026-10-13).
+      const card = node.role === 'link' && parent !== undefined && parent.role !== 'heading' ? cardOf(node) : undefined;
       if (card !== undefined) {
         // A whole-card link: its title, then its fields as its own lines.
         cards.add(node);
@@ -2090,7 +2179,7 @@ function scanPage(tree: AxTree): {
       } else if (value && hasNamedText(node)) {
         // Its own text lines already say it ("₹13,399", "M.R.P: ₹18,999"
         // under the price link "₹13,399 M.R.P: ₹18,999").
-      } else if (node.role === 'link' && parent !== undefined && node.name !== undefined && (namesThing(node.name) || (labelled && isValueName(node.name)))) {
+      } else if (node.role === 'link' && parent !== undefined && node.name !== undefined && (namesThing(node.name) || rows.has(node) || (labelled && isValueName(node.name)))) {
         fullText.set(text.length, node.name);
         line(`link ${JSON.stringify(clip(node.name, 80))}`);
       } else if ((node.role === 'link' || node.role === 'button') && parent !== undefined && node.name !== undefined && value) {
@@ -2121,6 +2210,9 @@ function scanPage(tree: AxTree): {
     units,
     headings,
     cards,
+    rows,
+    records,
+    url: tree.url,
     fullText,
     clipped,
     element: (node, said) => ({
@@ -2130,6 +2222,72 @@ function scanPage(tree: AxTree): {
       state: stateOf(node, index.get(refText(node))?.parent),
     }),
   };
+}
+
+/** Fewest records that make a page of records. */
+const MIN_ROWS = 3;
+
+/**
+ * The own link of each record on a page of repeated records: a table's rows,
+ * a results grid. The tree is flat (rows and cells are dropped before the
+ * brief is made), so a record is found by what repeats: a control every
+ * record carries under the same name ("Details", "Add to cart")
+ * marks one record per occurrence, and the one link between two occurrences
+ * whose name is on the page once is that record's own ("Acer
+ * rubrum"). Its name may be short: a two-word row name failed
+ * `namesThing`, so a 50-row table showed 15 three-word rows as "All 15
+ * listings" and none of the rows the task named (2026-10-13 recapture, 0
+ * of 5 needles). The first record's link is the last such link before the
+ * first occurrence, no further from it than the others are from theirs.
+ * Records only where at least {@link MIN_ROWS} are found, and two thirds of
+ * the occurrences have one: a repeated "Reply" between comments by repeated
+ * authors is no table. `records` is how many the page holds, a record with
+ * no link of its own included.
+ */
+function rowLeads(tree: AxTree): { readonly leads: ReadonlySet<AxNode>; readonly records: number } {
+  const controls: AxNode[] = [];
+  const walk = (node: AxNode): void => {
+    if (ACTIONABLE_ROLES.has(node.role)) controls.push(node);
+    for (const child of node.children ?? []) walk(child);
+  };
+  walk(tree.root);
+  const nameOf = (node: AxNode): string => (node.name ?? '').trim();
+  const counts = new Map<string, number[]>();
+  controls.forEach((node, at) => {
+    const name = nameOf(node);
+    if (name === '' || (node.role !== 'link' && node.role !== 'button')) return;
+    const seen = counts.get(name);
+    if (seen === undefined) counts.set(name, [at]);
+    else seen.push(at);
+  });
+  const unique = (at: number): boolean => {
+    const node = controls[at]!;
+    return node.role === 'link' && nameOf(node) !== '' && counts.get(nameOf(node))?.length === 1;
+  };
+  let best: AxNode[] = [];
+  let records = 0;
+  for (const [name, at] of counts) {
+    if (at.length < MIN_ROWS || PAGING.test(name)) continue;
+    const leads: AxNode[] = [];
+    let farthest = 0;
+    for (let index = 1; index < at.length; index += 1) {
+      const own: number[] = [];
+      for (let between = at[index - 1]! + 1; between < at[index]!; between += 1) if (unique(between)) own.push(between);
+      if (own.length !== 1) continue;
+      leads.push(controls[own[0]!]!);
+      farthest = Math.max(farthest, at[index]! - own[0]!);
+    }
+    for (let before = at[0]! - 1; before >= Math.max(0, at[0]! - farthest); before -= 1) {
+      if (!unique(before)) continue;
+      leads.unshift(controls[before]!);
+      break;
+    }
+    if (leads.length >= MIN_ROWS && leads.length * 3 >= at.length * 2 && leads.length > best.length) {
+      best = leads;
+      records = at.length;
+    }
+  }
+  return { leads: new Set(best), records };
 }
 
 /** A label this short ("$9.99", "4.5 out of 5 stars, rating details") that states a value is a value, not a title that mentions one. */

@@ -116,6 +116,7 @@ import type {
   ReflexTrace,
   RuledOut,
   StatusInput,
+  StepBrief,
   StepTrace,
   ToolTrace,
 } from './result';
@@ -125,6 +126,7 @@ import {
   answerMarksGap,
   boundMemory,
   evaluateSchema,
+  MAX_STEP_BRIEF_CHARS,
   MAX_TOOL_NOTE_CHARS,
   unmetReason,
   evaluateSubstance,
@@ -305,6 +307,12 @@ export interface ModelChoice {
    * behind an alias is ours; the rank is enough for an A/B that knows the alias.
    */
   readonly modelRank?: number;
+  /**
+   * The page as the deciding model read it, when the port builds one (the
+   * brain's brief). Recorded on the step, cut, and never projected to a
+   * customer: see `StepTrace.brief`.
+   */
+  readonly brief?: StepBrief;
 }
 
 /* ------------------------------------------------------------------ *
@@ -8059,6 +8067,8 @@ interface PendingStep {
   extractCut: ExtractCut | undefined;
   /** What a `callTool` step's tool answered, as far as it may be recorded. See `StepTrace.tool`. */
   tool: ToolTrace | undefined;
+  /** The brief this step's decision was made on. See `StepTrace.brief`. */
+  brief: StepBrief | undefined;
 }
 
 /**
@@ -8194,6 +8204,7 @@ function traceOf(
     ...(pending.held !== undefined ? { held: pending.held } : {}),
     ...(pending.extractCut !== undefined ? { extractCut: pending.extractCut } : {}),
     ...(pending.tool !== undefined ? { tool: pending.tool } : {}),
+    ...(pending.brief !== undefined ? { brief: pending.brief } : {}),
     ...(error !== undefined ? { error } : {}),
   };
 }
@@ -10546,6 +10557,7 @@ export async function runAgent<T = unknown>(
       held: undefined,
       extractCut: undefined,
       tool: undefined,
+      brief: undefined,
     };
 
     let terminal: 'done' | 'fail' | undefined;
@@ -11186,6 +11198,11 @@ export async function runAgent<T = unknown>(
               pending.reasoning = choice.reasoning;
               pending.reasoningTokens = choice.usage?.reasoningTokens;
               pending.modelRank = choice.modelRank;
+              // The brief of the LAST ask: a step that looked twice decided on the second.
+              pending.brief =
+                choice.brief === undefined
+                  ? undefined
+                  : { facts: choice.brief.facts.slice(0, MAX_STEP_BRIEF_CHARS.facts), elements: choice.brief.elements.slice(0, MAX_STEP_BRIEF_CHARS.elements) };
               listed = choice.alternatives ?? [];
               // MERGED, not assigned: a step that looked twice made two model
               // calls and the customer is billed for both, so the trace has to

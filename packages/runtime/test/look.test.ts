@@ -157,8 +157,8 @@ describe('page.look is bounded and fails as a step, never as a run', () => {
   });
 });
 
-describe('the loop carries a look to the next prompt and into the run usage', () => {
-  test('the answer is echoed to the model and its tokens are counted', async () => {
+describe('the loop carries a look to the next prompt, into the run usage and onto its step', () => {
+  test('the answer is echoed to the model, kept on the step, and its tokens are counted', async () => {
     const page = tree(node({ role: 'RootWebArea', name: 'canvas page', children: [node({ role: 'button', name: 'Go' })] }));
     const port = lookToolPort({
       camera: camera(),
@@ -176,6 +176,8 @@ describe('the loop carries a look to the next prompt and into the run usage', ()
 
     expect(h.prompts[1]?.toolResults?.[0]?.text).toContain('ZQ-4471-MBX');
     expect(h.prompts[1]?.tools?.map((tool) => tool.name)).toContain(LOOK_TOOL);
+    // The answer is on the durable step, not only in the next prompt.
+    expect(result.steps[0]?.tool?.note).toContain('ZQ-4471-MBX');
     // The look's 1,338 + 29 tokens on top of two actuator calls of 10 + 1.
     expect(result.usage.inputTokens).toBe(1358);
     expect(result.usage.outputTokens).toBe(31);

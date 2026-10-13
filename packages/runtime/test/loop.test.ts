@@ -6,7 +6,7 @@ import type { Action } from '../src/actions';
 import type { AgentPrompt, EvidenceOutcome, LockedPage, ModelChoice, PerformOutcome, ToolPort } from '../src/loop';
 import { LockNotHeldError, PageSession, observe, runAgent } from '../src/loop';
 import type { DurableRecord, StepTrace } from '../src/result';
-import { MAX_TOOL_NOTE_CHARS } from '../src/result';
+import { MAX_STEP_BRIEF_CHARS, MAX_TOOL_NOTE_CHARS, toWireStep } from '../src/result';
 import { filterTree, formatNodeRef, hashSnapshot, nodeRef } from '../src/snapshot';
 import { VirtualClock, catalogueTree, harness, node, refOf, testPricing } from './support';
 
@@ -2248,6 +2248,35 @@ describe('a tool call leaves its verdict, and only its port\u2019s note, on the 
     const result = await runAgent({ ...h.deps, tools: long }, { task: 't', caps: CAPS, stepFailures: 3 });
 
     expect(result.steps[0]?.tool?.note).toHaveLength(MAX_TOOL_NOTE_CHARS);
+  });
+});
+
+/**
+ * 2026-10-13: whether a miss's brief had dropped what the page showed could
+ * be learned only by recapturing the page, because no brief was stored. The
+ * step now keeps the brief its decision was made on.
+ */
+describe('the brief a decision was made on is kept on its step', () => {
+  const brief = { facts: 'Page: Results (chosen by rule)\nFacts: 2 of 9 listings shown | link "Red maple" [0-4]', elements: '[0-4] link "Red maple"' };
+
+  test('a decided step keeps its brief, a step decided on none keeps none, and the wire step carries neither', async () => {
+    const h = harness({ tree: page, model: script({ action: { type: 'scroll', dy: 400 }, brief }, { action: done }) });
+
+    const result = await runAgent(h.deps, { task: 't', caps: CAPS, stepFailures: 3 });
+
+    expect(result.steps[0]?.brief).toEqual(brief);
+    expect(result.steps[1]?.brief).toBeUndefined();
+    expect(JSON.stringify(toWireStep(result.steps[0]!))).not.toContain('Red maple');
+  });
+
+  test('a brief longer than the record keeps is cut', async () => {
+    const long = { facts: 'f'.repeat(9_000), elements: 'e'.repeat(9_000) };
+    const h = harness({ tree: page, model: script({ action: { type: 'scroll', dy: 400 }, brief: long }, { action: done }) });
+
+    const result = await runAgent(h.deps, { task: 't', caps: CAPS, stepFailures: 3 });
+
+    expect(result.steps[0]?.brief?.facts).toHaveLength(MAX_STEP_BRIEF_CHARS.facts);
+    expect(result.steps[0]?.brief?.elements).toHaveLength(MAX_STEP_BRIEF_CHARS.elements);
   });
 });
 

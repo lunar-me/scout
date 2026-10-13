@@ -355,8 +355,13 @@ export function lookToolPort(options: LookToolOptions): ToolPort {
     used += 1;
 
     const tally = `${LOOK_TOOL} (${String(used)} of ${String(limit)})`;
+    // The answer is kept on the step (`ToolCallOutcome.note`): it is the
+    // host's own reading of the page, and before it a look's answer lived
+    // only in the next prompt, so no miss that turned on one could be read
+    // back (8 of 20 research misses, 2026-10-13).
     if (!answer.found) {
-      return { isError: false, text: `${tally}: not visible on screen. ${answer.answer}`, usage: answer.usage };
+      const text = `${tally}: not visible on screen. ${answer.answer}`;
+      return { isError: false, text, note: text, usage: answer.usage };
     }
     const lines = [`${tally}: ${answer.answer}`];
     const point = answer.point === undefined ? undefined : fromGrid(answer.point, shot.viewport);
@@ -390,7 +395,8 @@ export function lookToolPort(options: LookToolOptions): ToolPort {
         );
       }
     }
-    return { isError: false, text: lines.join('\n'), usage: answer.usage };
+    const text = lines.join('\n');
+    return { isError: false, text, note: text, usage: answer.usage };
   }
 
   return {
