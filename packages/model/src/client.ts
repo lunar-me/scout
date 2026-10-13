@@ -762,6 +762,8 @@ export interface ModelClientOptions {
        */
       | { readonly repair: 'wrapped-bare-action' }
       | { readonly repair: 'hoisted-goal-from-actions' }
+      /** `finding`, `ruledOut`, `then` and the like written on `actions[0]`, moved beside it. */
+      | { readonly repair: 'hoisted-envelope-from-action'; readonly fields: readonly string[] }
       /**
        * One or more entries in `actions` past index 0 failed the ACTION
        * schema itself — a missing `type`, a stray property — and were
@@ -2379,6 +2381,34 @@ function repairAgentReply(parsed: unknown): {
         actions: kept.length > 0 ? kept : [{ type: 'wait', seconds: 1 }],
       };
       events.push({ repair: 'hoisted-goal-from-actions' });
+    }
+  }
+
+  // An envelope field written ON the chosen action rather than beside it:
+  // `{"actions":[{"type":"click","ref":"1-2","finding":"..."}]}`. The user
+  // message's own rules say "Any action may also carry "finding"" (and
+  // `then`), which reads as a property of the action, and a reply that took it
+  // that way was refused whole. Measured 2026-10-13 (Scout login example,
+  // local stock Chromium, a small hands model under `tool_choice`): 5 replies
+  // in 4 of 7 runs carried the finding on the action. Before this repair the refusal
+  // cost a second call and the answer that replaced it dropped the finding,
+  // the signed-in page's heading and message. The recorded bench results hold
+  // 5 more (`$.actions[0].finding: unexpected property`), one of which ended
+  // its run.
+  // Only `actions[0]` is untangled, because only it is performed; a field the
+  // reply already carries at its own level wins and the nested copy goes.
+  const chosen = Array.isArray(value['actions']) ? (value['actions'] as unknown[])[0] : undefined;
+  if (isRecord(chosen)) {
+    const nested = ENVELOPE_ONLY_KEYS.filter((key) => key !== 'goal' && key in chosen);
+    if (nested.length > 0) {
+      const action = { ...chosen };
+      const lifted: Record<string, unknown> = {};
+      for (const key of nested) {
+        if (value[key] === undefined) lifted[key] = action[key];
+        delete action[key];
+      }
+      value = { ...value, ...lifted, actions: [action, ...(value['actions'] as unknown[]).slice(1)] };
+      events.push({ repair: 'hoisted-envelope-from-action', fields: nested });
     }
   }
 

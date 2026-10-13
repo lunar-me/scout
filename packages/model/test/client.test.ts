@@ -225,6 +225,37 @@ describe('the agent step', () => {
     expect(repairs).toEqual([{ repair: 'hoisted-goal-from-actions' }]);
   });
 
+  // The prompt's rule reads "Any action may also carry "finding"", and a small
+  // hands model under `tool_choice` wrote it on the action (2026-10-13). The
+  // refusal cost a call and the retry dropped the finding.
+  test('a finding written on the chosen action is kept as the reply finding, not refused', async () => {
+    const page = cartPage(225);
+    const checkout = refOf(page, 'Checkout');
+    const ref = `${String(checkout.frameOrdinal)}-${String(checkout.backendNodeId)}`;
+    const { client, provider } = clientWith([
+      reply(JSON.stringify({ actions: [{ type: 'click', ref, finding: 'heading: Secure Area' }] })),
+    ]);
+
+    const choice = await client.choose(promptFor(page));
+
+    expect(provider.calls).toBe(1);
+    expect(choice.action).toEqual({ type: 'click', ref: checkout });
+    expect(choice.envelope?.finding).toBe('heading: Secure Area');
+  });
+
+  test('a finding the reply already carries wins over one nested on the action', async () => {
+    const page = cartPage(226);
+    const checkout = refOf(page, 'Checkout');
+    const ref = `${String(checkout.frameOrdinal)}-${String(checkout.backendNodeId)}`;
+    const { client } = clientWith([
+      reply(JSON.stringify({ finding: 'reply level', actions: [{ type: 'click', ref, finding: 'nested' }] })),
+    ]);
+
+    const choice = await client.choose(promptFor(page));
+
+    expect(choice.envelope?.finding).toBe('reply level');
+  });
+
   test('a goal update written as an action becomes the reply goal, not a failed step', async () => {
     const page = cartPage(224);
     const { client, provider } = clientWith([

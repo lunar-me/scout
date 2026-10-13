@@ -74,6 +74,21 @@ describe('collected data accumulates rather than replacing', () => {
     expect(mergeData({ a: 1 }, undefined)).toEqual({ a: 1 });
   });
 
+  test('a field a later page left empty keeps the value an earlier page gave it', () => {
+    const signedIn = { heading: 'Secure Area', message: 'You logged into a secure area!', signedOut: '' };
+    const signedOut = { heading: '', message: null, signedOut: 'You logged out of the secure area!' };
+    expect(mergeData(signedIn, signedOut)).toEqual({
+      heading: 'Secure Area',
+      message: 'You logged into a secure area!',
+      signedOut: 'You logged out of the secure area!',
+    });
+  });
+
+  test('an empty value still lands where nothing was held, and a real value always replaces', () => {
+    expect(mergeData({ a: '' }, { a: null, b: '' })).toEqual({ a: null, b: '' });
+    expect(mergeData({ a: 'old', n: 3 }, { a: 'new', n: 0 })).toEqual({ a: 'new', n: 0 });
+  });
+
   test('a non-record replaces, because there is nothing to merge into', () => {
     expect(mergeData({ a: 1 }, [1, 2])).toEqual([1, 2]);
   });

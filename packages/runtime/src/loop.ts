@@ -3761,12 +3761,18 @@ export const FINISH_HOLD_TOLERANCE = 3;
  * What the loop says while it is holding a finished answer open for unclosed
  * sub-goals. `schema` says which kind of answer it is holding: a schema run's
  * filled fields, or a schema-less run's extraction marked final.
+ *
+ * It shows the `done` closure as well as the `failed` one; it used to show
+ * only `failed`. Measured 2026-10-13 on one recorded prompt (Scout login example,
+ * schema satisfied, its one sub-goal open; a small hands model, n=12 each): 2
+ * replies of 12 closed the sub-goal with the old wording, 7 of 12 with this.
  */
 function openGoalsNotice(open: readonly GoalState[], schema: boolean): string {
   return (
     `${schema ? 'Your answer already satisfies the schema' : 'Your answer is recorded'}, but ${String(open.length)} sub-goal(s) you stated are ` +
     `still open (${open.map((goal) => `${goal.id} ${goal.goal}`).join('; ')}), so the run is not over. ` +
-    'Either finish them, or close each one you cannot do with ' +
+    'Close each one that is finished with {"goal":{"id":"...","status":"done","summary":"what happened"}}, ' +
+    'finish the rest, or close each one you cannot do with ' +
     '{"goal":{"id":"...","status":"failed","summary":"why"}} — that is a real answer and it costs you ' +
     'no step. Four of five is better than none, but four of five reported as five is worse than either.'
   );
@@ -6118,8 +6124,15 @@ export function compactHistory(
                 `, ${element.tab ?? 'one tab'} dropped: ${element.reason ?? 'no reason recorded'}`,
             )
             .join('');
+    // The node by its role and name, as the step trace records it: the bare
+    // action names no node, and "click the node -> ok" twice cannot tell a
+    // submitted login from a logout. Measured 2026-10-13 on one recorded
+    // prompt (Scout login example, back on the login page after logging out,
+    // the signed-in page already extracted; a small hands model, n=12 each):
+    // with "click the node" the model submitted the login form again 9 times
+    // of 12; with the nodes named it extracted the page 10 times of 12.
     lines.push(
-      `  ${String(step.index)}${goal} ${describeAction(step.action)} -> ${outcome}${chained}${fan}`,
+      `  ${String(step.index)}${goal} ${step.observed?.description ?? describeAction(step.action)} -> ${outcome}${chained}${fan}`,
     );
   }
   return lines;

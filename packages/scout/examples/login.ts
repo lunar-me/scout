@@ -13,15 +13,17 @@ import { Scout } from '@outcrawl/scout';
 
 import { modelsFromEnv } from './models';
 
-const username = process.env['DEMO_USERNAME'] ?? 'tomsmith';
-const password = process.env['DEMO_PASSWORD'] ?? 'SuperSecretPassword!';
+const username = process.env['DEMO_USERNAME'] ?? 'student';
+const password = process.env['DEMO_PASSWORD'] ?? 'Password123';
 
 const scout = new Scout({ browser: { launch: {} }, models: modelsFromEnv() });
 
+// Each step is named in the task, the read included: a small hands model told only to
+// "report" what the signed-in page shows often logs out before it has read that page.
 const result = await scout.run(
-  `Go to https://the-internet.herokuapp.com/login and sign in with username "${username}" and password ` +
-    `"${password}". Report the heading and the message shown once you are signed in, then log out and ` +
-    'report the message shown after logging out.',
+  `Go to https://practicetestautomation.com/practice-test-login/ and sign in with username "${username}" and ` +
+    `password "${password}". Then extract the heading and the message of the page you reach. ` +
+    'Then log out and extract the heading of the page you land on.',
   {
     caps: { steps: 15, duration: '4m' },
     schema: {
@@ -29,9 +31,9 @@ const result = await scout.run(
       properties: {
         signedInHeading: { type: 'string' },
         signedInMessage: { type: 'string' },
-        signedOutMessage: { type: 'string' },
+        signedOutHeading: { type: 'string' },
       },
-      required: ['signedInHeading', 'signedInMessage', 'signedOutMessage'],
+      required: ['signedInHeading', 'signedInMessage', 'signedOutHeading'],
     },
   },
 );

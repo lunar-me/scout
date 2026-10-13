@@ -1028,13 +1028,31 @@ export function totalCredits(steps: readonly StepTrace[]): string {
  * Folds a new extraction into what the run has already collected. Records
  * merge field by field, so a run that gets two fields on step 3 and two more
  * on step 7 returns four; anything else replaces.
+ *
+ * A field the new extraction left EMPTY (`null`, or a string with nothing but
+ * whitespace in it) does not replace one the run already holds a value for.
+ * An extraction reads only the page in front of it, and a schema that requires
+ * a string field gives the extractor no way to omit one that page does not
+ * show: measured 2026-10-13, the real extract request on a signed-out page with
+ * an instruction asking only for the signed-out message (n=5) returned `""` for
+ * both signed-in fields 4 times. Merged by plain spread, that read erases a
+ * signed-in heading and message the run read on an earlier page. A page
+ * stating a field is empty and a page not showing it read the same here; the
+ * merge keeps the value the run read.
  */
 export function mergeData(collected: unknown, next: unknown): unknown {
   if (next === undefined) {
     return collected;
   }
   if (isRecord(collected) && isRecord(next)) {
-    return { ...collected, ...next };
+    const merged: Record<string, unknown> = { ...collected };
+    for (const [key, value] of Object.entries(next)) {
+      const held = collected[key];
+      const blank = value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
+      const holds = held !== undefined && held !== null && !(typeof held === 'string' && held.trim() === '');
+      if (!(blank && holds)) merged[key] = value;
+    }
+    return merged;
   }
   return next;
 }

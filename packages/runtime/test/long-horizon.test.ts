@@ -17,7 +17,7 @@ import type { AgentPrompt, ModelChoice } from '../src/loop';
 import { compactHistory, PLANNING_STEP_THRESHOLD, runAgent } from '../src/loop';
 import { toWireStep } from '../src/result';
 import type { StepTrace } from '../src/result';
-import type { AxTree } from '../src/snapshot';
+import { nodeRef, type AxTree } from '../src/snapshot';
 import { FractionalClock, harness, node, refOf, tree } from './support';
 
 /* ------------------------------------------------------------------ *
@@ -497,6 +497,30 @@ describe('compaction keeps what a later step needs', () => {
     const lines = compactHistory(steps, 8);
     expect(lines[0]).toBe('Already done:');
     expect(lines).toHaveLength(4);
+  });
+
+  test('two clicks on different nodes read as different steps in the history', () => {
+    const click = (index: number, backendNodeId: number, description: string): StepTrace => ({
+      index,
+      action: { type: 'click', ref: nodeRef(1, backendNodeId) },
+      observed: { ref: `1-${backendNodeId}`, description, method: 'click', xpath: '' },
+      cache: { status: 'MISS', reason: 'x' },
+      elapsedMs: 1,
+      snapshotHash: 'h',
+      credits: '0',
+      spent: '0',
+      pages: 0,
+      durationMs: 0,
+      bandwidthBytes: 0,
+      usage: {},
+      at: '2026-10-13T00:00:00.000Z',
+    });
+    const [, submitted, loggedOut] = compactHistory(
+      [click(0, 232, 'click the button "Submit"'), click(1, 851, 'click the link "Log out"')],
+      8,
+    );
+    expect(submitted).toContain('"Submit"');
+    expect(loggedOut).toContain('"Log out"');
   });
 });
 
