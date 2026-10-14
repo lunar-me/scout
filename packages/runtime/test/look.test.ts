@@ -8,7 +8,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import type { LookAnswer, LookCamera, LookQuestion, LookShot, LookVision } from '../src/look';
-import { LOOK_TOOL, MAX_FAILED_LOOKS, MAX_LOOKS_PER_RUN, looksTaken, lookToolPort } from '../src/look';
+import { DEFAULT_LOOKS_PER_RUN, LOOK_TOOL, MAX_FAILED_LOOKS, lookAllowance, looksTaken, lookToolPort } from '../src/look';
 import type { ModelChoice } from '../src/loop';
 import { runAgent } from '../src/loop';
 import { formatNodeRef, nodeRef } from '../src/snapshot';
@@ -116,16 +116,30 @@ describe('page.look reads pixels for a text-only actuator', () => {
 });
 
 describe('page.look is bounded and fails as a step, never as a run', () => {
-  test(`the ${String(MAX_LOOKS_PER_RUN)}th look is the last one a run gets`, async () => {
+  test(`the ${String(DEFAULT_LOOKS_PER_RUN)}th look is the last one a run gets`, async () => {
     const eyes = vision(() => ({ answer: 'x', found: true, usage: {} }));
     const port = lookToolPort({ camera: camera(), vision: eyes });
-    for (let i = 0; i < MAX_LOOKS_PER_RUN; i += 1) {
+    for (let i = 0; i < DEFAULT_LOOKS_PER_RUN; i += 1) {
       expect((await port.call(LOOK_TOOL, { question: 'q' })).isError).toBe(false);
     }
     const spent = await port.call(LOOK_TOOL, { question: 'q' });
     expect(spent.isError).toBe(true);
     expect(spent.text).toContain('spent');
-    expect(eyes.asked).toHaveLength(MAX_LOOKS_PER_RUN);
+    expect(eyes.asked).toHaveLength(DEFAULT_LOOKS_PER_RUN);
+  });
+
+  test('the allowance is a share of the budget: a long run gets more, a short one fewer, none gets nothing', async () => {
+    const eyes = vision(() => ({ answer: 'x', found: true, usage: {} }));
+    const long = lookToolPort({ camera: camera(), vision: eyes, maxLooks: lookAllowance('300.00') });
+    for (let i = 0; i < 40; i += 1) {
+      expect((await long.call(LOOK_TOOL, { question: 'q' })).isError).toBe(false);
+    }
+    expect((await long.call(LOOK_TOOL, { question: 'q' })).text).toContain('40 of 40 times this run and is spent');
+    expect(lookAllowance('2000')).toBeGreaterThan(lookAllowance('300.00'));
+    expect(lookAllowance('60')).toBe(DEFAULT_LOOKS_PER_RUN);
+    expect(lookAllowance('20.00')).toBe(2);
+    expect(lookAllowance('0.50')).toBe(1);
+    expect(lookAllowance('not a number')).toBe(DEFAULT_LOOKS_PER_RUN);
   });
 
   test('a camera that cannot photograph costs no look', async () => {
@@ -204,9 +218,9 @@ describe('what a look reports when it could not identify the element', () => {
 describe('the look allowance is per run, across every browser the run holds', () => {
   test('a port seeded with the looks earlier browsers took has only the rest', async () => {
     const eyes = vision(() => ({ answer: 'x', found: true, usage: {} }));
-    const port = lookToolPort({ camera: camera(), vision: eyes, taken: MAX_LOOKS_PER_RUN - 1 });
+    const port = lookToolPort({ camera: camera(), vision: eyes, taken: DEFAULT_LOOKS_PER_RUN - 1 });
     const last = await port.call(LOOK_TOOL, { question: 'q' });
-    expect(last.text).toContain(`(${String(MAX_LOOKS_PER_RUN)} of ${String(MAX_LOOKS_PER_RUN)})`);
+    expect(last.text).toContain(`(${String(DEFAULT_LOOKS_PER_RUN)} of ${String(DEFAULT_LOOKS_PER_RUN)})`);
     expect((await port.call(LOOK_TOOL, { question: 'q' })).text).toContain('spent');
     expect(eyes.asked).toHaveLength(1);
   });
@@ -241,7 +255,7 @@ describe('the look allowance is per run, across every browser the run holds', ()
     expect(looksTaken(result.steps)).toBe(2);
     // The next browser's port, seeded from those steps, continues the count.
     const next = lookToolPort({ camera: camera(), vision: vision(() => ({ answer: 'x', found: true, usage: {} })), taken: looksTaken(result.steps) });
-    expect((await next.call(LOOK_TOOL, { question: 'q' })).text).toContain(`(3 of ${String(MAX_LOOKS_PER_RUN)})`);
+    expect((await next.call(LOOK_TOOL, { question: 'q' })).text).toContain(`(3 of ${String(DEFAULT_LOOKS_PER_RUN)})`);
   });
 });
 

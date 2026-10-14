@@ -62,6 +62,35 @@ export type ActionType = (typeof ACTION_TYPES)[number];
 export type TabId = string;
 
 /**
+ * The host declined to perform an action: the press, hover or drag it asked
+ * for was never sent, because the target cannot be reached the way the page
+ * stands — it is off screen in a way no scroll fixes, drawn over, not laid
+ * out, disabled, or a point outside the viewport. The host's sentence says
+ * which, and what to do instead.
+ *
+ * Thrown by a binding's `perform`, and NOT a page failing to answer. The loop
+ * records the step as failed, so the model reads the refusal on the next
+ * prompt, but does not charge it to `stepFailures`: that count is for a page
+ * that ignores what is sent, and nothing was sent. MEASURED in production, 7
+ * days to 2026-10-14: of 580 runs of consecutive refusals, the step after
+ * one refusal worked 464 times in 496, after two 55 in 58, after three 16 in
+ * 18, and all 8 runs of four ended there, on the stop this charge tripped.
+ *
+ * `target` names what was refused, so the loop can tell a model trying
+ * something different from one repeating a refusal it has already read: a
+ * repeat is charged like any other failure.
+ */
+export class RefusedActionError extends Error {
+  readonly target: string;
+
+  constructor(message: string, target: string) {
+    super(message);
+    this.name = 'RefusedActionError';
+    this.target = target;
+  }
+}
+
+/**
  * A click on a node, or on a POINT of the viewport.
  *
  * `at` exists for what the tree cannot name: a spot on a `<canvas>` (IW6,

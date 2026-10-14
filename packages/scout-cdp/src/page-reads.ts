@@ -50,6 +50,23 @@ export async function documentClip<T extends { readonly x: number; readonly y: n
 }
 
 /**
+ * How far `target`'s document is scrolled and how tall it is, CSS px, from
+ * `Page.getLayoutMetrics` (a browser-side read the page cannot see), or
+ * `undefined` when the reply lacks either. Two of these either side of a
+ * wheel gesture say whether the PAGE moved, which a target's box alone cannot:
+ * a box that stayed put under a page that scrolled is fixed to the viewport,
+ * or is being pushed down by content loading above it.
+ */
+export async function scrollPosition(target: CdpPage): Promise<{ readonly y: number; readonly height: number } | undefined> {
+  const metrics = await target.send('Page.getLayoutMetrics');
+  const css = metrics['cssLayoutViewport'];
+  const content = metrics['cssContentSize'];
+  const y = typeof css === 'object' && css !== null && 'pageY' in css ? css.pageY : undefined;
+  const height = typeof content === 'object' && content !== null && 'height' in content ? content.height : undefined;
+  return typeof y === 'number' && typeof height === 'number' ? { y, height } : undefined;
+}
+
+/**
  * A scroll request bounded to what the wheel can deliver, as `[dx, dy]`.
  *
  * Within one gesture ({@link MAX_REACH_GESTURE_PX}) it is returned as asked.

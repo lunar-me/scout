@@ -44,14 +44,14 @@ import { axTreeFromCdp, frameOrdinalsOf } from './ax-tree';
 import { isCdpTimeout, type CdpPage } from './cdp';
 import { readDocument } from './document';
 import { pageCamera } from './camera';
-import { ancestorsOf, descendantsOf, documentClip, elementOf, hitAt, inLookWorld, onScreenPart, reachable, viewport } from './page-reads';
+import { ancestorsOf, descendantsOf, documentClip, elementOf, hitAt, inLookWorld, onScreenPart, reachable, scrollPosition, viewport } from './page-reads';
 import { childFrameIds } from './frames';
 import { outcrawlFlavor } from './flavor';
 import type { LoadRequest, LoadResult, ShotRegion, TabHooks } from './hooks';
 import type { BindingOptions } from './options';
 import { dialogReadMs } from './dialog';
 import { DRAG_OVER_INTERVAL_MS, DRAG_START_WAIT_MS, liftOf, type Html5DragArm } from './drag';
-import { NoModelError, CoveredTargetError, CrossFrameRefError, DISABLEABLE_TAGS, DisabledTargetError, FilesUnavailableError, HandsUnavailableError, NativeSelectPopupError, OffScreenTargetError, PointerAimRefusedError, UnmeasurableTargetError, UnperformableActionError, opensPopupMenu, type CoverAccount, type Hit, type ShownNode } from './errors';
+import { NoModelError, CoveredTargetError, CrossFrameRefError, DISABLEABLE_TAGS, DisabledTargetError, FilesUnavailableError, HandsUnavailableError, NativeSelectPopupError, OffScreenTargetError, PointerAimRefusedError, UnmeasurableTargetError, UnperformableActionError, opensPopupMenu, overlayAccount, type CoverAccount, type Hit, type ShownNode } from './errors';
 import { DEFAULT_LOCK_TIMEOUT_MS, ERROR_PAGE_PREFIX, FREEZE_REPLY_DEADLINE_MS, FreezeNotAnsweredError, LOADING_HOLDS_BEFORE_TURN, NAVIGATION_FREEZE_HOLD_MS, StillLoadingError, UNANSWERED_RELEASE_WAIT_MS, heldFreezes, within } from './freeze';
 import type { HandsContext, HandsPort, HandsStep, HandsTarget, PointerSample } from './hands';
 import { selfReleases, sendUntilForwarded } from './input';
@@ -2008,6 +2008,37 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
           continue;
         }
       }
+      /**
+       * TO THE SIDE OF THE VIEWPORT, NO PAGE SCROLL REACHES IT, so no wheel is
+       * spent trying. What lies wholly left or right of the viewport is in a
+       * strip or panel the page moves itself — a carousel whose own scroller
+       * would have been wheeled just above, or one it slides by transform, or
+       * an off-canvas menu — and only its own control brings it in. MEASURED,
+       * production 7 days to 2026-10-14: 79 of 215 "the page did not move"
+       * refusals, over 29 runs, were boxes wholly to the side (a closed menu's
+       * "Coupons & Deals" at x = -760, 40 steps over 8 runs on one shop), and
+       * every one had first wheeled the page vertically and then blamed it.
+       * Reproduced on the fleet the same day (`/connect`, n=3): a search
+       * page's image strip, items at x = 1372, 2933 and 3753 of a 1200 px
+       * viewport, each refused after a vertical wheel that could not help.
+       */
+      if (box.x + box.width <= 0 || box.x >= view.width) {
+        const shown = park(ref, aim);
+        throw new OffScreenTargetError({
+          action,
+          ref,
+          box,
+          viewport: view,
+          scrolls: gestures,
+          why:
+            `it lies ${box.x < 0 ? 'left' : 'right'} of the viewport, where scrolling the page up or down never ` +
+            'brings it — it is in a carousel, slider or side panel the page has moved out of view — so ' +
+            shown,
+          remedy:
+            'Bring it in the way the page does: the next or previous arrow of the strip it is in, or the ' +
+            'button that opens the menu or panel that holds it. Or choose something that is on screen.',
+        });
+      }
       if (scrolls >= MAX_SCROLLS_TO_REACH) {
         throw new OffScreenTargetError({
           action,
@@ -2030,7 +2061,12 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
       // browser refused (-32602), which failed the step with a message about
       // the wheel instead of the target: 18 click steps over 7 production runs
       // in the 7 days to 2026-09-24, repeated on the same node step after step.
-      if (Math.abs(dy) < 1) {
+      // The same holds for a box already wholly inside the viewport's height:
+      // nothing above or below is missing, so a wheel only moves the page off
+      // it. Production stealth runs 2026-10-06/07 wheeled 1x1 visually hidden
+      // inputs at (32, 441) and (64, 422) of a 719 px viewport that way, then
+      // blamed the page.
+      if (Math.abs(dy) < 1 || (box.y >= 0 && box.y + box.height <= view.height)) {
         const shown = park(ref, aim);
         throw new OffScreenTargetError({
           action,
@@ -2039,9 +2075,10 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
           viewport: view,
           scrolls: gestures,
           why:
-            'it is already level with the middle of the viewport and still not on screen — it lies ' +
-            'outside the viewport to the side, or is too thin to hit — so scrolling the page cannot ' +
-            `reach it; ${shown}`,
+            'it is already within the height of the viewport and still has no area to hit — it is too ' +
+            'small to press (a control hidden from sight and drawn by its label or by a picture), or lies ' +
+            `partly outside the viewport to the side — so scrolling the page cannot reach it; ${shown}`,
+          remedy: 'Act on what is drawn for it instead: its label, or the visible control beside it.',
         });
       }
       // TOO FAR FOR ONE CLICK. Refused before the gesture that would pass the
@@ -2062,6 +2099,7 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
         });
       }
       const wasAt = box.y;
+      const pageWas = await scrollPosition(session).catch(() => undefined);
       // At most MAX_REACH_GESTURE_PX per gesture, so the wheel finishes before
       // the command deadline. A shortened gesture is part of the approach and
       // does not count against MAX_SCROLLS_TO_REACH; the next turn continues it.
@@ -2078,14 +2116,51 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
       if (Math.abs(box.y - wasAt) < SCROLL_PROGRESS_PX) {
         const shown = park(ref, aim);
         /**
-         * WHERE THE WHEEL WENT IN, AND WHAT WAS UNDER IT. A wheel scrolls what
-         * is under the pointer, and this refusal has fired in production on
-         * pages a plain wheel scrolls (`run_d3745e88`: aaha.org and
-         * catvets.com, which a `/connect` probe scrolled 600 px with one wheel
-         * at the viewport centre on 2026-09-25) without the record saying
-         * where its wheel landed. Not measured yet: whether it was a nested
-         * scroller, an overlay or a paused page. This names it the next time.
+         * WHY IT DID NOT MOVE, told as the cause and what undoes it. The
+         * refusal used to say "fixed to the viewport, or inside a container
+         * this page does not scroll" for every case, and in production (7
+         * days to 2026-10-14, 215 steps over 103 runs) most were neither.
+         * Reproduced on the fleet that day through this binding (`/connect`):
+         *
+         * - THE PAGE SCROLLED AND IT CAME ALONG: a search results page that
+         *   loads more results as it scrolls, its footer link at y = 6582.
+         *   Two gestures took the page from 0 to 12,677 px while it grew from
+         *   7,357 to 19,821 px, and the footer stayed 6,582 px down (n=3).
+         * - THE PAGE DID NOT SCROLL, held by something over it: a home page
+         *   that opened a modal dialog on the first scroll (html and body
+         *   went `overflow: hidden`), and a bot check's full-page frame.
+         *
+         * Whether the page moved is `Page.getLayoutMetrics` either side of the
+         * gesture; what holds it is the cover account a covered click gets,
+         * for whatever the wheel went in over.
          */
+        const pageIs = await scrollPosition(session).catch(() => undefined);
+        const moved = pageWas === undefined || pageIs === undefined ? 0 : Math.abs(pageIs.y - pageWas.y);
+        if (moved >= SCROLL_PROGRESS_PX) {
+          const grew = pageIs === undefined || pageWas === undefined ? 0 : pageIs.height - pageWas.height;
+          const feed = grew >= SCROLL_PROGRESS_PX;
+          throw new OffScreenTargetError({
+            action,
+            ref,
+            box,
+            viewport: view,
+            scrolls: gestures,
+            why: feed
+              ? `the page scrolled ${moved.toFixed(0)} px toward it and grew ${grew.toFixed(0)} px taller above ` +
+                'it, so it moved away as fast as the page scrolled — it sits below content that keeps loading as ' +
+                `the page scrolls, and no amount of scrolling reaches it — so ${shown}`
+              : `the page scrolled ${moved.toFixed(0)} px and it stayed where it was — it is fixed to the ` +
+                'viewport outside the visible part, and the page brings it in on its own, not by scrolling — so ' +
+                shown,
+            ...(feed
+              ? {
+                  remedy:
+                    'Reach it another way: open the page it leads to by its address if you know it, follow a ' +
+                    'link elsewhere that leads there, or use {"type":"extract"} if you only need to read it.',
+                }
+              : {}),
+          });
+        }
         const wheel = plan.find((step) => step.command === 'Outcrawl.dispatchWheelPath');
         const wheelAt =
           wheel === undefined ? undefined : { x: Number(wheel.params['x']), y: Number(wheel.params['y']) };
@@ -2093,6 +2168,13 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
           wheelAt === undefined || !Number.isFinite(wheelAt.x) || !Number.isFinite(wheelAt.y)
             ? undefined
             : await hitAt(session, wheelAt).catch(() => undefined);
+        const account = under === undefined ? undefined : await accountFor(session, ref, under, 0).catch(() => undefined);
+        const where =
+          wheelAt === undefined
+            ? ''
+            : `; the wheel went in at (${wheelAt.x.toFixed(0)}, ${wheelAt.y.toFixed(0)})` +
+              (account === undefined ? '' : `, over ${account.element}`);
+        const held = account?.overlay === undefined ? undefined : overlayAccount(account.overlay);
         throw new OffScreenTargetError({
           action,
           ref,
@@ -2100,12 +2182,11 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
           viewport: view,
           scrolls: gestures,
           why:
-            'the page did not move under it — it is fixed to the viewport, or inside a ' +
-            `container this page does not scroll — so ${shown}` +
-            (wheelAt === undefined
-              ? ''
-              : `; the wheel went in at (${wheelAt.x.toFixed(0)}, ${wheelAt.y.toFixed(0)})` +
-                (under === undefined ? '' : `, over ${await nameOf(session, under.backendNodeId)}`)),
+            held !== undefined
+              ? `the page did not scroll: ${held.what} holds it still${where}, so ${shown}`
+              : 'the page did not move under it — it is fixed to the viewport, or inside a ' +
+                `container this page does not scroll — so ${shown}${where}`,
+          ...(held === undefined ? {} : { remedy: held.remedy }),
         });
       }
     }
@@ -2384,7 +2465,10 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
       return reached;
     };
     const refuse = async (cover: Hit): Promise<never> => {
-      const account = await accountFor(session, ref, cover);
+      const key = formatNodeRef(ref);
+      const refusals = (coveredRefusals.get(key) ?? 0) + 1;
+      coveredRefusals.set(key, refusals);
+      const account = await accountFor(session, ref, cover, refusals);
       // A second refusal of the same click: the model is repeating a click
       // that cannot land, so the node leaves the page it is shown until the
       // cover goes. See {@link covered}.
@@ -2520,17 +2604,14 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
    * node of the model's tree it is (or the nearest ancestor the tree has),
    * and what it is part of when that is over the page — an open dialog
    * ({@link MODAL_OF}) or something fixed to the viewport ({@link FIXED_OF})
-   * — with the controls in it whose names say they put it away. Counts the
-   * refusal against `ref`.
+   * — with the controls in it whose names say they put it away. `refusals`
+   * is the caller's count of covered refusals of this same click.
    *
    * The tree is `filterTree(snapshot())`, the one the model is shown, so every
    * reference named here is one `validateAction` accepts. Nodes are matched
    * only in `ref`'s own frame: the hit test ran in that frame's renderer.
    */
-  async function accountFor(session: CdpPage, ref: NodeRef, cover: Hit): Promise<CoverAccount> {
-    const key = formatNodeRef(ref);
-    const refusals = (coveredRefusals.get(key) ?? 0) + 1;
-    coveredRefusals.set(key, refusals);
+  async function accountFor(session: CdpPage, ref: NodeRef, cover: Hit, refusals: number): Promise<CoverAccount> {
     const element = await nameOf(session, cover.backendNodeId);
     const over = async (declaration: string): Promise<number | undefined> => {
       const id = await inLookWorld(session, cover.frameId, {

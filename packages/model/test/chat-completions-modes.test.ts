@@ -13,10 +13,11 @@
 import { describe, expect, test } from 'bun:test';
 import { formatNodeRef } from '@outcrawl/runtime';
 
+import { BRAIN_SCHEMA, readDecision } from '../src/brain';
 import { ModelClient } from '../src/client';
 import { CostLedger } from '../src/ledger';
 import { ChatCompletionsProvider } from '../src/chat-completions';
-import { ModelSchemaError } from '../src/provider';
+import { ModelSchemaError, ModelUnusableError } from '../src/provider';
 import type { HttpPost, HttpResponse } from '../src/http';
 import { cartPage, promptFor, refOf, thrownBy } from './support';
 
@@ -147,5 +148,68 @@ describe('an invalid tool_choice reply is corrected, exactly like a strict-mode 
     const thrown = await thrownBy(client.choose(promptFor(page)));
 
     expect(thrown).toBeInstanceOf(ModelSchemaError);
+  });
+});
+
+/**
+ * 'tool_auto': the brain's reply through an offered, unforced tool, read by
+ * the same `ModelClient.extract` and `readDecision` the harness uses.
+ * MUTATIONS THIS CATCHES: a reply the model wrote as text read as empty (as a
+ * 'tool_choice' reply with no call is), which would turn every text reply into
+ * a re-ask; a markup-only reply no longer read as its decision; a runaway
+ * asked again without end, or not asked again at all.
+ */
+describe("'tool_auto': the brain's decision", () => {
+  const NAVIGATE = { do: 'act', a: { type: 'navigate', url: 'https://example.com/search?q=lighthouse' } };
+  const input = { instruction: null, schema: BRAIN_SCHEMA, content: { kind: 'markdown', markdown: 'Step 1/30.' } } as const;
+
+  function textResponse(content: string, finish = 'stop'): HttpResponse {
+    return {
+      status: 200,
+      body: {
+        id: 'gen-auto-1',
+        choices: [{ index: 0, finish_reason: finish, message: { role: 'assistant', content } }],
+        usage: { prompt_tokens: 40, completion_tokens: finish === 'length' ? 3000 : 12, cost: '0.00001' },
+      },
+    };
+  }
+
+  function brainOn(responses: readonly HttpResponse[]) {
+    const { post, sent } = postingSequence(responses);
+    const client = new ModelClient({
+      provider: new ChatCompletionsProvider({
+        name: 'gateway',
+        url: 'https://gateway.example/v1/chat/completions',
+        apiKey: 'test-key',
+        httpPost: post,
+        outputMode: () => 'tool_auto',
+      }),
+      model: 'brain-model',
+      session: { sessionId: 'sess-auto', accountId: 'acct-auto' },
+      ledger: new CostLedger(),
+    });
+    return { decide: async () => readDecision((await client.extract(input, { salvageTruncated: true })).data), sent };
+  }
+
+  test('a tool call, a clean JSON text reply and a markup-only text reply are the same decision, each on one call', async () => {
+    const markupOnly =
+      '\n<invoke>\n<parameter name="do">act</parameter>\n' +
+      `<parameter name="a">${JSON.stringify(NAVIGATE.a)}</parameter>\n</invoke>`;
+    for (const response of [toolCallResponse(JSON.stringify(NAVIGATE)), textResponse(JSON.stringify(NAVIGATE)), textResponse(markupOnly)]) {
+      const { decide, sent } = brainOn([response]);
+      expect(await decide()).toEqual({ kind: 'act', why: '', notes: {}, need: [], then: [], action: NAVIGATE.a });
+      expect(sent.length).toBe(1);
+    }
+  });
+
+  test('a runaway of empty tags is asked once more, and a second runaway ends there', async () => {
+    const runaway = textResponse('\n<invoke>\n</invoke>\n\n\n'.repeat(400), 'length');
+    const recovered = brainOn([runaway, toolCallResponse(JSON.stringify(NAVIGATE))]);
+    expect((await recovered.decide())?.kind).toBe('act');
+    expect(recovered.sent.length).toBe(2);
+
+    const stuck = brainOn([runaway]);
+    expect(await thrownBy(stuck.decide())).toBeInstanceOf(ModelUnusableError);
+    expect(stuck.sent.length).toBe(2);
   });
 });

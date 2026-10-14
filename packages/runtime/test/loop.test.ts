@@ -2,9 +2,9 @@ import { describe, expect, test } from 'bun:test';
 
 import { compareDecimal, multiplyDecimal } from '@outcrawl/scout-core';
 
-import type { Action } from '../src/actions';
+import { RefusedActionError, type Action } from '../src/actions';
 import type { AgentPrompt, EvidenceOutcome, LockedPage, ModelChoice, PerformOutcome, ToolPort } from '../src/loop';
-import { LockNotHeldError, PageSession, observe, runAgent } from '../src/loop';
+import { LockNotHeldError, PageSession, REFUSED_STEP_TOLERANCE, observe, runAgent } from '../src/loop';
 import type { DurableRecord, StepTrace } from '../src/result';
 import { MAX_STEP_BRIEF_CHARS, MAX_TOOL_NOTE_CHARS, toWireStep } from '../src/result';
 import { filterTree, formatNodeRef, hashSnapshot, nodeRef } from '../src/snapshot';
@@ -2308,5 +2308,43 @@ describe('only the first listed action runs, and the next prompt says which did 
     expect(count(prompts[1], '"Search"')).toBe(count(prompts[0], '"Search"') + 1);
     // After step 1, which listed nothing, that list is stale and not named.
     expect(count(prompts[2], '"Widget A"')).toBe(count(prompts[0], '"Widget A"'));
+  });
+});
+
+describe('a refusal is not the page failing to answer', () => {
+  const caps = { steps: 20, budget: '5.00', duration: '5m' };
+  /** A host that refuses every click, naming the target `name(n)` on the n-th. */
+  const refuses = (name: (n: number) => string) => {
+    let n = 0;
+    return (action: Action): void => {
+      if (action.type === 'click') throw new RefusedActionError(`refused: ${name(n)}`, name(n++));
+    };
+  };
+
+  test('refusals of different targets do not spend stepFailures, and the run goes on to finish', async () => {
+    const h = harness({
+      tree: page,
+      perform: refuses((n) => `target ${String(n)}`),
+      model: script(...Array.from({ length: 5 }, () => ({ action: click })), { action: done }),
+    });
+    const result = await runAgent(h.deps, { task: 'open it', caps, stepFailures: 3 });
+    expect(result.steps.filter((step) => step.error !== undefined)).toHaveLength(5);
+    expect(result.status).toBe('completed');
+  });
+
+  test('a target refused before is charged: the model was told and did it anyway', async () => {
+    const h = harness({ tree: page, perform: refuses(() => 'the same target'), model: () => ({ action: click }) });
+    const result = await runAgent(h.deps, { task: 'open it', caps, stepFailures: 3 });
+    // The first refusal is free; the next four are charged, and the fourth charge is past the tolerance.
+    expect(result.steps).toHaveLength(5);
+    expect(result.stopReason).toBe('error');
+  });
+
+  test(`refusals with no completed step between them stop the run after ${String(REFUSED_STEP_TOLERANCE)}`, async () => {
+    const h = harness({ tree: page, perform: refuses((n) => `target ${String(n)}`), model: () => ({ action: click }) });
+    const result = await runAgent(h.deps, { task: 'open it', caps, stepFailures: 3 });
+    expect(result.steps).toHaveLength(REFUSED_STEP_TOLERANCE + 1);
+    expect(result.stopReason).toBe('error');
+    expect(result.error).toBe(`refused: target ${String(REFUSED_STEP_TOLERANCE)}`);
   });
 });

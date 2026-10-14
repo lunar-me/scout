@@ -1709,6 +1709,101 @@ describe('a run a cap stopped before it answered returns every read, not the las
   });
 });
 
+describe('a run that stops after the loop held its answer returns that draft, not its reads (run_…)', () => {
+  /**
+   * run_… (production 2026-10-13): its `done` at step 26 held the whole
+   * answer and was refused for one open sub-goal; the run then stopped
+   * `error` on three incomplete reads and returned "Partial extraction
+   * observations" instead. Production, 30 days to 2026-10-14: 106 of 144
+   * schema-less runs that stopped on an error or a ceiling after a refused
+   * `done` returned an extraction dump.
+   */
+  const plan = { plan: [{ id: 'g1', goal: 'the price' }, { id: 'g2', goal: 'the rating' }] };
+  const DRAFT = 'The Acer AL15G-53 costs ₹79,990 and is rated 3.8.';
+
+  test('an error stop returns the refused draft, says it was not accepted, and keeps what was read after it', async () => {
+    const h = harness({
+      tree: page,
+      model: script(
+        { action: click, envelope: plan },
+        { action: { type: 'done', summary: DRAFT } },
+        { action: { type: 'extract', instruction: 'the reviews' } },
+        { action: click },
+      ),
+      extract: (): ExtractOutcome => ({ data: '108 reviews, mostly about the fan noise' }),
+      perform: (action, _signal, _allowance) => {
+        if (action.type === 'click' && h.performed.length > 1) throw new Error('the page went away');
+      },
+    });
+    const result = await runAgent(h.deps, { task: 'the price and rating of the laptop', caps: CAPS, stepFailures: null });
+
+    expect(result.steps[1]?.error).toContain('done was refused');
+    expect(result.stopReason).toBe('error');
+    expect(result.status).toBe('partial');
+    expect(result.error).toContain('the page went away');
+    const data = String(result.data);
+    expect(data).toStartWith('Drafted answer, not accepted');
+    expect(data).toContain(DRAFT);
+    expect(data.indexOf('108 reviews')).toBeGreaterThan(data.indexOf(DRAFT));
+  });
+
+  test('a capped run returns the draft ahead of its reads', async () => {
+    const h = harness({
+      tree: page,
+      model: script(
+        { action: click, envelope: plan },
+        { action: { type: 'done', summary: DRAFT } },
+        { action: { type: 'extract', instruction: 'the reviews' } },
+        { action: { type: 'extract', instruction: 'the warranty' } },
+      ),
+      extract: (_schema, instruction): ExtractOutcome => ({ data: `read of ${instruction ?? ''}` }),
+    });
+    const result = await runAgent(h.deps, { task: 'the price and rating of the laptop', caps: { ...CAPS, steps: 4 }, stepFailures: null });
+
+    expect(result.status).toBe('capped');
+    const data = String(result.data);
+    expect(data).toStartWith('Drafted answer, not accepted');
+    expect(data).toContain(DRAFT);
+    expect(data).toContain('read of the warranty');
+    expect(data).not.toContain('before it confirmed a complete answer');
+  });
+
+  test("the model's own fail after the draft stands: the draft is not returned over it", async () => {
+    const h = harness({
+      tree: page,
+      model: script(
+        { action: click, envelope: plan },
+        { action: { type: 'done', summary: DRAFT } },
+        { action: { type: 'fail', reason: 'the rating is not on this site' } },
+      ),
+    });
+    const result = await runAgent(h.deps, { task: 'the price and rating of the laptop', caps: CAPS, stepFailures: null });
+
+    expect(result.stopReason).toBe('gave-up');
+    expect(String(result.data ?? '')).not.toContain(DRAFT);
+  });
+
+  test('an answer extracted after the draft is the answer the stopped run returns', async () => {
+    const h = harness({
+      tree: page,
+      model: script(
+        { action: click, envelope: plan },
+        { action: { type: 'done', summary: DRAFT } },
+        { action: { type: 'extract', instruction: 'the price and the rating', final: true } },
+        { action: click },
+      ),
+      extract: (): ExtractOutcome => ({ data: '₹79,990, rated 3.4' }),
+      perform: (action) => {
+        if (action.type === 'click' && h.performed.length > 1) throw new Error('the page went away');
+      },
+    });
+    const result = await runAgent(h.deps, { task: 'the price and rating of the laptop', caps: CAPS, stepFailures: null });
+
+    expect(result.stopReason).toBe('error');
+    expect(result.data).toBe('₹79,990, rated 3.4');
+  });
+});
+
 describe('a finish the gate turned away does not make the rest of the task unplanned work (run_…, run_…)', () => {
   const ANSWER = { type: 'object', required: ['answer'], properties: { answer: { type: 'string' } } };
   /**

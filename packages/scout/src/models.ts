@@ -59,7 +59,7 @@ function providerFor(
       if (event.source === 'estimate' && rates?.[event.model] === undefined) onUnpriced(event.model);
     },
   });
-  const others = (['tool_choice', 'json_object', 'strict'] as const).filter((other) => other !== mode);
+  const others = (['tool_choice', 'json_object', 'strict', 'tool_auto'] as const).filter((other) => other !== mode);
   return {
     name: provider.name,
     complete: async (request) => {

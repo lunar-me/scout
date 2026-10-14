@@ -141,7 +141,7 @@ const SCHEMA_NAME = 'outcrawl_reply';
  * {@link ChatCompletionsProvider.complete} checks separately.
  *
  * `stop` is the success case for 'strict' and 'json_object' mode.
- * `tool_calls` is the success case for 'tool_choice' mode (see
+ * `tool_calls` is the success case for 'tool_choice' and 'tool_auto' mode (see
  * {@link StructuredOutputMode}) and is deliberately absent from this map — it
  * used to be an impossible value back when this client sent no tools at all;
  * now it is simply not a failure.
@@ -200,13 +200,29 @@ export function firstJsonObject(text: string): string | undefined {
  *                  shape guarantee) plus the schema spelled out in the system
  *                  prompt (see {@link systemContent}); `ModelClient`'s own
  *                  validation and corrections hold the shape.
+ *   'tool_auto'    the same single function tool as 'tool_choice', offered
+ *                  with `tool_choice: 'auto'`, for a model that reasons and so
+ *                  cannot be forced to call it. The reply is the call's
+ *                  arguments, or the message text when the model wrote its
+ *                  reply as text instead, read like a 'json_object' reply.
+ *
+ * 'tool_auto' exists for a reasoning model that, offered no tool, writes
+ * tool-call markup (`<invoke>`, `<parameter name="do">`) as its reply text
+ * after it has thought, and sometimes repeats it to the token cap. Measured on
+ * one brain model, its captured request bodies replayed step by step through
+ * this client (MarkupSlip, 2026-10-14, same prompts per arm). Two long research
+ * runs, n=100 a mode: 'json_object' wrote markup in 80 replies (80 of the 90
+ * that reasoned, 0 of the 10 that did not), ran 9 to the cap and re-asked 9,
+ * 1,124 output tokens a step; 'tool_auto' called the tool on 100, markup 0,
+ * cut 0, re-asked 0, 765 output tokens a step. Fourteen shorter runs, n=113:
+ * markup 56 vs 0, cut 5 vs 0, re-asked 10 vs 0, 644 vs 468 tokens a step.
  *
  * The tool's description is part of the measurement: with
  * `'Record the reply.'`, a frontier model as actor nested a top-level property
  * inside an array item on 8/16 calls; the sentence {@link schemaFields} sends
  * scored 30/32 (2026-09-24, commit 2eb0352).
  */
-export type StructuredOutputMode = 'strict' | 'tool_choice' | 'json_object';
+export type StructuredOutputMode = 'strict' | 'tool_choice' | 'tool_auto' | 'json_object';
 
 /**
  * A gateway's upstream routing block (`provider` in the request body), for an
@@ -787,7 +803,7 @@ function schemaFields(
             ...(ignore.length === 0 ? {} : { ignore }),
           },
         };
-  if (mode === 'tool_choice') {
+  if (mode === 'tool_choice' || mode === 'tool_auto') {
     return {
       tools: [
         {
@@ -804,9 +820,10 @@ function schemaFields(
           },
         },
       ],
-      // FORCED: the one legal value measured working. `'auto'` is a
-      // different, weaker request and is not offered here.
-      tool_choice: { type: 'function', function: { name: SCHEMA_NAME } },
+      // 'tool_choice' FORCES the call: the one legal value measured working
+      // there. A model that reasons refuses a forced call alongside its
+      // thinking (a gateway 404, 2026-10-01), so 'tool_auto' offers it.
+      tool_choice: mode === 'tool_auto' ? 'auto' : { type: 'function', function: { name: SCHEMA_NAME } },
       ...provider,
     };
   }
@@ -820,10 +837,11 @@ function schemaFields(
 }
 
 /**
- * The system message text. Every mode but `'json_object'` sends the caller's
- * text unchanged — `'json_object'` guarantees syntactically valid JSON and
- * nothing about its shape, so the schema has to be spelled out in words
- * instead of enforced.
+ * The system message text. 'strict' and 'tool_choice' send the caller's text
+ * unchanged — `'json_object'` guarantees syntactically valid JSON and nothing
+ * about its shape, so the schema has to be spelled out in words instead of
+ * enforced, and 'tool_auto' has to say that the tool is how to answer, since
+ * nothing forces the call.
  *
  * The addendum is schema-agnostic — no field name from any caller's schema
  * appears in it — because it runs for every schema sent to a `'json_object'`
@@ -833,7 +851,13 @@ function schemaFields(
  * first-pass valid, the model nesting the reply's `finding` inside an action.
  */
 function systemContent(request: ModelRequest, mode: StructuredOutputMode): string {
-  if (mode !== 'json_object' || request.schema === undefined) {
+  if (request.schema === undefined) {
+    return request.system;
+  }
+  if (mode === 'tool_auto') {
+    return `${request.system}\n\nReply by calling the ${SCHEMA_NAME} tool once, with your reply as its arguments; write no text.`;
+  }
+  if (mode !== 'json_object') {
     return request.system;
   }
   return (
@@ -874,16 +898,22 @@ function providerError(name: string, status: number, body: unknown): ModelProvid
  * string parses into exactly the same shape `'strict'` mode's `content`
  * would have. No further transform: the schema travelled unmodified, so the
  * reply needs none either.
+ * `'tool_auto'` carries it the same way when the model called the tool, and
+ * as `message.content` when it answered in text instead: that text goes to the
+ * same reader a `'json_object'` reply does, markup and all.
  */
 function replyText(mode: StructuredOutputMode, message: Record<string, unknown> | undefined): string {
   if (message === undefined) {
     return '';
   }
-  if (mode === 'tool_choice') {
+  if (mode === 'tool_choice' || mode === 'tool_auto') {
     const toolCalls = message['tool_calls'];
     const first = Array.isArray(toolCalls) && isRecord(toolCalls[0]) ? toolCalls[0] : undefined;
     const fn = first !== undefined && isRecord(first['function']) ? first['function'] : undefined;
-    return (fn === undefined ? undefined : asString(fn['arguments'])) ?? '';
+    const args = fn === undefined ? undefined : asString(fn['arguments']);
+    if (mode === 'tool_choice' || args !== undefined) {
+      return args ?? '';
+    }
   }
   return asString(message['content']) ?? '';
 }

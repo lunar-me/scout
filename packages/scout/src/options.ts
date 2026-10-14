@@ -27,6 +27,9 @@ export interface RoleModel {
    * - `'tool_choice'` (the default) forces one function call whose parameters
    *   are the schema. Function calling is the most widely supported way to get
    *   structured output across chat-completions endpoints.
+   * - `'tool_auto'` offers that function without forcing it, for a reasoning
+   *   model whose endpoint refuses a forced call while it thinks. A model that
+   *   answers in text instead is read as `'json_object'` is.
    * - `'json_object'` asks for any JSON and spells the schema out in the
    *   prompt, for an endpoint without function calling.
    * - `'strict'` sends a strict `json_schema` response format, for an endpoint
@@ -198,9 +201,10 @@ function checkRole(role: Role, value: unknown): RoleModel | undefined {
     structuredOutput !== undefined &&
     structuredOutput !== 'strict' &&
     structuredOutput !== 'tool_choice' &&
+    structuredOutput !== 'tool_auto' &&
     structuredOutput !== 'json_object'
   ) {
-    throw new ScoutConfigError(`models.${role}.structuredOutput must be one of strict, tool_choice, json_object`);
+    throw new ScoutConfigError(`models.${role}.structuredOutput must be one of strict, tool_choice, tool_auto, json_object`);
   }
   if (headers !== undefined && (!isRecord(headers) || Object.values(headers).some((v) => typeof v !== 'string'))) {
     throw new ScoutConfigError(`models.${role}.headers must map header names to strings`);

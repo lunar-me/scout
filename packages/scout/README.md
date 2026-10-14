@@ -103,7 +103,7 @@ Each job takes:
 - `baseURL`: the endpoint, the part before `/chat/completions`.
 - `apiKey`: sent as a bearer token. `''` sends none, for a local server.
 - `effort` (optional): `'minimal' | 'low' | 'medium' | 'high'`, for models that take a reasoning effort.
-- `structuredOutput` (optional): how a JSON reply is asked for. `'tool_choice'` (default) asks for one function call whose parameters are the schema, which most endpoints support; `'json_object'` asks for any JSON and spells the schema out; `'strict'` sends a strict `json_schema` response format. If your endpoint refuses one, the run's error names the job and the setting to change.
+- `structuredOutput` (optional): how a JSON reply is asked for. `'tool_choice'` (default) asks for one function call whose parameters are the schema, which most endpoints support; `'tool_auto'` offers that function without forcing it, for a reasoning model whose endpoint will not force a call while it thinks; `'json_object'` asks for any JSON and spells the schema out; `'strict'` sends a strict `json_schema` response format. If your endpoint refuses one, the run's error names the job and the setting to change.
 - `headers` (optional): extra headers for every request.
 
 **Cost.** When your endpoint states a cost per call, `result.costUsd` is the run's model spend. To price models yourself, and to hold a run to a `caps.budget`, pass `models.rates` with every job's model:

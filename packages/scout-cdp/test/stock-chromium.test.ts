@@ -485,4 +485,96 @@ bars.addEventListener('mouseleave', function () { clearTimeout(wait); barTip.sty
       expect(seen).toEqual([[], ['Jun: 71 mm'], ['Region 4: 520 units'], ['Jan: 52 mm']]);
     }, 60_000);
   });
+
+  describe('a click on a target that is not on screen', () => {
+    const page = (style: string, body: string, script = ''): string =>
+      `data:text/html,${encodeURIComponent(
+        `<!doctype html><html><head><title>Reach</title><style>body{margin:0;font:16px sans-serif}${style}</style></head>` +
+          `<body>${body}<script>${script}</script></body></html>`,
+      )}`;
+    const target = '<a id="t" href="#t" onclick="document.title=\'clicked\';return false">Target link</a>';
+
+    test('scrolls a link below the fold into view and clicks it', async () => {
+      const tab = await chrome.open(page('', `<p>Top</p><div style="height:2400px"></div>${target}<div style="height:3000px"></div>`));
+      const deps = bind(tab);
+      await deps.perform({ type: 'click', ref: nodeNamed(await deps.snapshot(), 'link', 'Target link').ref });
+      expect(await evaluate(tab, 'document.title')).toBe('clicked');
+      expect(Number(await evaluate(tab, 'scrollY'))).toBeGreaterThan(1500);
+    }, 60_000);
+
+    test('clicks a link a sticky header is drawn over', async () => {
+      const tab = await chrome.open(
+        page(
+          'header{position:sticky;top:0;height:120px;background:#eee;z-index:5}',
+          `<header>Site header</header><div style="height:1600px"></div>${target}<div style="height:3000px"></div>`,
+          "scrollTo(0, document.getElementById('t').offsetTop - 40);",
+        ),
+      );
+      const deps = bind(tab);
+      const ref = nodeNamed(await deps.snapshot(), 'link', 'Target link').ref;
+      // Under the header as the page stands.
+      expect(await evaluate(tab, "document.elementFromPoint(20, document.getElementById('t').getBoundingClientRect().top + 5).tagName")).toBe('HEADER');
+      await deps.perform({ type: 'click', ref });
+      expect(await evaluate(tab, 'document.title')).toBe('clicked');
+    }, 60_000);
+
+    test('under a dialog that holds the page still is refused with the dialog and its close control', async () => {
+      // A dialog opened over the page locks its scrolling, as a sign-up
+      // prompt does: the wheel moves nothing, and closing it is the way on.
+      const tab = await chrome.open(
+        page(
+          'html.locked,html.locked body{overflow:hidden} #d{position:fixed;inset:20% 20%;background:#fff;border:1px solid}',
+          `<div id="d" role="dialog" aria-modal="true" aria-label="Sign up"><button onclick="d.remove();document.documentElement.className=''">Close</button></div>` +
+            `<div style="height:2400px"></div>${target}<div style="height:3000px"></div>`,
+          "document.documentElement.className='locked';",
+        ),
+      );
+      const deps = bind(tab);
+      const ref = nodeNamed(await deps.snapshot(), 'link', 'Target link').ref;
+      const error = await Promise.resolve()
+        .then(() => deps.perform({ type: 'click', ref }))
+        .catch((caught: unknown) => caught);
+      expect(String(error)).toContain('the page did not scroll: a dialog open over the page');
+      expect(String(error)).toMatch(/Close it with button "Close" \[\d+-\d+\], then try again\./);
+      expect(await evaluate(tab, 'document.title')).toBe('Reach');
+    }, 60_000);
+
+    test('to the side of the viewport is refused without moving the page, and refusals do not stop the run', async () => {
+      // An off-canvas menu: its links are laid out left of the viewport until
+      // the page slides it in, and no vertical scroll reaches them.
+      const links = ['Home', 'Deals', 'Stores', 'Help', 'Account'].map((name) => `<a href="#${name}">${name}</a>`).join('');
+      const tab = await chrome.open(
+        page(
+          'nav{position:fixed;top:0;left:-320px;width:300px;display:flex;flex-direction:column}',
+          `<nav>${links}</nav><h1>Shop</h1><div style="height:600px"></div>${target}<div style="height:3000px"></div>`,
+        ),
+      );
+      const deps = bind(tab);
+      const menu = new Set(['Home', 'Deals', 'Stores', 'Help', 'Account']);
+      const result = await runAgent(
+        {
+          ...deps,
+          model: (prompt): ModelChoice => {
+            // Each refused link leaves the page the model is shown, so the
+            // next one is always whichever menu link is still listed.
+            const next = walk(prompt.tree).find((node) => node.role === 'link' && menu.has(node.name ?? ''));
+            if (next !== undefined) return { action: { type: 'click', ref: next.ref } };
+            const link = walk(prompt.tree).find((node) => node.role === 'link' && node.name === 'Target link');
+            if (prompt.step < 7 && link !== undefined) return { action: { type: 'click', ref: link.ref } };
+            return { action: { type: 'done', summary: 'clicked' } };
+          },
+        },
+        { task: 'Open the target link.', caps: { steps: 10, budget: '5.00', duration: '2m' }, stepFailures: 3 },
+      );
+
+      const refused = result.steps.filter((step) => step.error !== undefined);
+      expect(refused).toHaveLength(5);
+      for (const step of refused) {
+        expect(step.error).toContain('left of the viewport');
+        expect(step.error).toContain('nothing was dispatched');
+      }
+      expect(result.stopReason).not.toBe('error');
+      expect(await evaluate(tab, 'document.title')).toBe('clicked');
+    }, 90_000);
+  });
 });

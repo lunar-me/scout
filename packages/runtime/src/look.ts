@@ -50,7 +50,7 @@
  * one figure the ledger and the invoice already share. Its tokens ride
  * {@link ToolCallOutcome.usage} into the step's usage and the run's `tokens`
  * meter row, so cost accounting sees them. Bounded per run by
- * {@link MAX_LOOKS_PER_RUN}.
+ * {@link lookAllowance}: a share of the run's own budget.
  */
 
 import type { JsonSchema, Usage } from '@outcrawl/scout-core';
@@ -63,15 +63,52 @@ import { formatNodeRef, parseNodeRef } from './snapshot';
 export const LOOK_TOOL = 'page.look';
 
 /**
- * How many looks one run may make.
- *
- * A look costs one vision call and a couple of seconds, so the bound is on
- * TIME and runaway loops rather than money: eight is two or three reads plus a
- * verification on each of a few pages, which is more than any measured
- * perception failure needed, and small enough that a model asking the same
- * question every step stops within eight steps instead of spending its budget.
+ * How many looks a run may make when nothing says what it can afford: the
+ * allowance every run had before it scaled with the budget, and still what a
+ * binding given no `maxLooks` hands out (Scout, whose budget is in another
+ * unit, and tests).
  */
-export const MAX_LOOKS_PER_RUN = 8;
+export const DEFAULT_LOOKS_PER_RUN = 8;
+
+/**
+ * The most one look costs, in credits: what {@link lookAllowance} divides
+ * the budget's share by. MEASURED in production, 7 days to 2026-10-14, n=692
+ * answered looks: the vision call's own cost was $0.00075 at the median and
+ * $0.0039 at p99 (11,596 input and 785 output tokens), which at the dearest
+ * credit (the Builder plan: 10,000 credits for $49, model spend marked up
+ * 1.70) is 0.26 and 1.34 credits; its inference took 2.1 s at the median and
+ * 10.7 s at p99, another 0.04 to 0.18 credits of browser time at a credit a
+ * minute. So 1.5 is the p99 look, rounded up, and the median look costs about
+ * a fifth of it.
+ */
+export const LOOK_CREDITS_BOUND = 1.5;
+
+/**
+ * The share of a run's budget its looks may spend, priced at
+ * {@link LOOK_CREDITS_BOUND} each.
+ *
+ * A FIXED EIGHT starved long runs and let short ones spend out of proportion.
+ * Production, the same 7 days: 14 runs took all eight, 8 of them on
+ * 2,000-credit budgets that ended between 119 and 1,539 credits spent (one
+ * that ended at 865 was refused its ninth look), while eight p99 looks are 12
+ * credits, 60% of a 20-credit run. A fifth of the budget gives a 60-credit
+ * run the eight it had, 300 credits 40, 2,000 credits 266, and 20 credits
+ * two; at the median look the share actually spent is about 4%. The run's
+ * own budget cap still bounds every credit.
+ */
+export const LOOK_BUDGET_SHARE = 0.2;
+
+/**
+ * How many looks a run with `budget` credits may make: as many p99 looks as
+ * {@link LOOK_BUDGET_SHARE} of it buys, and at least one. `budget` is
+ * `caps.budget`, a decimal credit string; one that does not parse gets
+ * {@link DEFAULT_LOOKS_PER_RUN}.
+ */
+export function lookAllowance(budget: string): number {
+  const credits = Number(budget);
+  if (!Number.isFinite(credits) || credits < 0) return DEFAULT_LOOKS_PER_RUN;
+  return Math.max(1, Math.floor((credits * LOOK_BUDGET_SHARE) / LOOK_CREDITS_BOUND));
+}
 
 /**
  * How many times the vision model may FAIL a look before `page.look` is
@@ -190,7 +227,8 @@ export const LOOK_TOOL_DESCRIPTION =
   'image, a chart or map, which item is coloured, highlighted or selected, ratings drawn as icons, or to ' +
   'check a visual result such as a shape you drew. Ask WHERE something is to get its position and, when an ' +
   'element is painted there, its [F-N] reference to act on. It sees only what is on screen: scroll first ' +
-  `for anything below. It takes a few seconds and is limited to ${String(MAX_LOOKS_PER_RUN)} per run.`;
+  "for anything below. It takes a few seconds, and the run's budget sets how many it gets: each answer says how " +
+  'many are used.';
 
 export function lookTools(): readonly ExposedTool[] {
   return [{ name: LOOK_TOOL, description: LOOK_TOOL_DESCRIPTION, inputSchema: LOOK_INPUT_SCHEMA }];
@@ -263,7 +301,7 @@ function errorText(error: unknown): string {
 export interface LookToolOptions {
   readonly camera: LookCamera;
   readonly vision: LookVision;
-  /** Defaults to {@link MAX_LOOKS_PER_RUN}. */
+  /** Defaults to {@link DEFAULT_LOOKS_PER_RUN}; a host that knows the run's budget passes {@link lookAllowance}. */
   readonly maxLooks?: number;
   /**
    * Looks this RUN already took on earlier browsers — {@link looksTaken} over
@@ -303,7 +341,7 @@ export function looksTaken(steps: readonly StepTrace[]): number {
  * tally, which the run's re-acquisition breaker already bounds.
  */
 export function lookToolPort(options: LookToolOptions): ToolPort {
-  const limit = options.maxLooks ?? MAX_LOOKS_PER_RUN;
+  const limit = options.maxLooks ?? DEFAULT_LOOKS_PER_RUN;
   const tools = lookTools();
   let used = options.taken ?? 0;
   let failedAsks = 0;

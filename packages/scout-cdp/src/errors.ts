@@ -1,4 +1,4 @@
-import { ACTIONABLE_ROLES, formatNodeRef, type NodeRef } from '@outcrawl/runtime';
+import { ACTIONABLE_ROLES, formatNodeRef, RefusedActionError, type NodeRef } from '@outcrawl/runtime';
 import type { HandsTarget } from './hands';
 import type { DescribedElement } from './reach';
 
@@ -178,7 +178,7 @@ export class UnperformableActionError extends Error {
  * real outcome rather than failing quietly is what `loop-detected` and
  * `account-exhausted` do for a run; this does it for a step.
  */
-export class OffScreenTargetError extends Error {
+export class OffScreenTargetError extends RefusedActionError {
   readonly ref: NodeRef;
   /** Where the node's box was when the attempt gave up, viewport-relative. */
   readonly box: HandsTarget;
@@ -197,6 +197,8 @@ export class OffScreenTargetError extends Error {
     readonly viewport: { readonly width: number; readonly height: number };
     readonly scrolls: number;
     readonly why: string;
+    /** What to do instead, when the cause names something better than another way round. */
+    readonly remedy?: string;
   }) {
     const { action, ref, box, viewport, scrolls, why } = options;
     super(
@@ -207,8 +209,8 @@ export class OffScreenTargetError extends Error {
           ? 'There is no coordinate that lands on it, and nothing was dispatched.'
           : `${String(scrolls)} scroll gesture(s) were sent without bringing it into view, so no press ` +
             'was sent, and the page stays where those gestures left it.') +
-        ' Reach it another way: a link to the page that shows it, or {"type":"extract"} if you only ' +
-        'need to read it.',
+        ` ${options.remedy ?? 'Reach it another way: a link to the page that shows it, or {"type":"extract"} if you only need to read it.'}`,
+      formatNodeRef(ref),
     );
     this.name = 'OffScreenTargetError';
     this.ref = ref;
@@ -255,6 +257,20 @@ function shownText(node: ShownNode): string {
 }
 
 /**
+ * An overlay as a refusal names it — what it is, and what puts it away — for
+ * a click it covers ({@link CoveredTargetError}) and for a page it holds still
+ * ({@link OffScreenTargetError}).
+ */
+export function overlayAccount(overlay: NonNullable<CoverAccount['overlay']>): { readonly what: string; readonly remedy: string } {
+  const node = overlay.node === undefined ? '' : ` (${shownText(overlay.node)})`;
+  const close =
+    overlay.dismiss.length > 0 ? `Close it with ${overlay.dismiss.map(shownText).join(' or ')}, then try again.` : undefined;
+  return overlay.kind === 'dialog'
+    ? { what: `a dialog open over the page${node}`, remedy: close ?? 'Answer or close it first: use its own controls, or press Escape.' }
+    : { what: `something fixed over the page${node}`, remedy: close ?? 'Close it if it can be closed, or reach this control another way.' };
+}
+
+/**
  * A click whose target is drawn under something else, everywhere it is on
  * screen.
  *
@@ -286,7 +302,7 @@ function shownText(node: ShownNode): string {
  * production 7 days, 43 of 194 covered-target steps were such repeats, and
  * `run_bc9b76c6` ended on "refusal 3 of this same click".
  */
-export class CoveredTargetError extends Error {
+export class CoveredTargetError extends RefusedActionError {
   readonly ref: NodeRef;
   readonly cover: CoverAccount;
 
@@ -301,23 +317,18 @@ export class CoveredTargetError extends Error {
         ? ` What is drawn over it is ${shownText(cover.shown)}, a different control from the one you named. ` +
           `If that is what you meant, click [${formatNodeRef(cover.shown.ref)}]; otherwise reach this one another way.`
         : undefined;
-    const close = (dismiss: readonly ShownNode[]): string =>
-      `Close it with ${dismiss.map(shownText).join(' or ')}, then try again.`;
     let next: string;
     const overlay = cover.overlay;
     if (overlay?.kind === 'dialog') {
-      next =
-        ` It is a dialog open over the page${overlay.node === undefined ? '' : ` (${shownText(overlay.node)})`}, ` +
-        'and nothing under it can be clicked until it is closed. ' +
-        (overlay.dismiss.length > 0
-          ? close(overlay.dismiss)
-          : 'Answer or close it first: use its own controls, or press Escape.');
+      const { what, remedy } = overlayAccount(overlay);
+      next = ` It is ${what}, and nothing under it can be clicked until it is closed. ${remedy}`;
     } else if (overlay !== undefined) {
+      const { what, remedy } = overlayAccount(overlay);
+      const closable = overlay.dismiss.length > 0;
       next =
-        ` It is part of something fixed over the page${overlay.node === undefined ? '' : ` (${shownText(overlay.node)})`}, ` +
-        'which stays where it is when the page scrolls.' +
-        (overlay.dismiss.length > 0 ? ` ${close(overlay.dismiss)}` : '') +
-        (control ?? (overlay.dismiss.length > 0 ? '' : ' Close it if it can be closed, or reach this control another way.'));
+        ` It is part of ${what}, which stays where it is when the page scrolls.` +
+        (closable ? ` ${remedy}` : '') +
+        (control ?? (closable ? '' : ` ${remedy}`));
     } else if (control !== undefined) {
       next = control;
     } else {
@@ -329,6 +340,7 @@ export class CoveredTargetError extends Error {
       `covered-target: ${action} names node ${ref.frameOrdinal}-${ref.backendNodeId}, and everywhere it is ` +
         `on screen something else is drawn on top of it (${cover.element}), so a press there would land on that ` +
         `instead. Nothing was dispatched.${again}${next}`,
+      formatNodeRef(ref),
     );
     this.name = 'CoveredTargetError';
     this.ref = ref;
@@ -354,7 +366,7 @@ export class CoveredTargetError extends Error {
  * label the page may still act on (a press that explains what is missing), so
  * a click on one is sent.
  */
-export class DisabledTargetError extends Error {
+export class DisabledTargetError extends RefusedActionError {
   readonly ref: NodeRef;
 
   constructor(action: string, ref: NodeRef, tag: string) {
@@ -363,6 +375,7 @@ export class DisabledTargetError extends Error {
         'press on it does nothing. Nothing was dispatched. A control like this usually enables once the page ' +
         'finishes loading or once what it needs is filled in: read the page again, and act on what it asks ' +
         'for first.',
+      formatNodeRef(ref),
     );
     this.name = 'DisabledTargetError';
     this.ref = ref;
@@ -406,7 +419,7 @@ export const DISABLEABLE_TAGS: Readonly<Record<string, true>> = {
  * A `<select multiple>` or one with `size` > 1 is a list box drawn in the page,
  * with no popup, and is pressed like anything else.
  */
-export class NativeSelectPopupError extends Error {
+export class NativeSelectPopupError extends RefusedActionError {
   readonly ref: NodeRef;
 
   constructor(action: string, ref: NodeRef) {
@@ -414,6 +427,7 @@ export class NativeSelectPopupError extends Error {
       `native-select: ${action} names node ${formatNodeRef(ref)}, a dropdown whose list the operating system ` +
         'draws outside the page. Nothing was dispatched. Choose from it with `select` and the option you want — ' +
         'its options are listed under it in the page read.',
+      formatNodeRef(ref),
     );
     this.name = 'NativeSelectPopupError';
     this.ref = ref;
@@ -443,7 +457,7 @@ export function opensPopupMenu(element: DescribedElement): boolean {
  * replacement, and a node found that way after the page changed is exactly
  * how a click lands on the wrong thing. The next read has the live node.
  */
-export class UnmeasurableTargetError extends Error {
+export class UnmeasurableTargetError extends RefusedActionError {
   readonly ref: NodeRef;
   readonly reason: 'not-rendered' | 'replaced';
 
@@ -457,6 +471,7 @@ export class UnmeasurableTargetError extends Error {
           : 'no longer exists: the page replaced it after it was read. Choose it again from the ' +
             'page as it is now; the old reference will not come back.') +
         ' Nothing was dispatched.',
+      formatNodeRef(ref),
     );
     this.name = 'UnmeasurableTargetError';
     this.ref = ref;
@@ -473,11 +488,13 @@ export class UnmeasurableTargetError extends Error {
  * at the nearest edge is one it never pointed at. The message names the
  * viewport it measured, which is the one fact that model is missing.
  */
-export class PointerAimRefusedError extends Error {
+export class PointerAimRefusedError extends RefusedActionError {
   readonly reason: 'outside-viewport' | 'nothing-there' | 'embedded-frame' | 'too-short' | 'too-long' | 'split-frames';
 
   constructor(action: string, reason: PointerAimRefusedError['reason'], detail: string) {
-    super(`${action} refused (${reason}): ${detail} Nothing was dispatched.`);
+    const message = `${action} refused (${reason}): ${detail} Nothing was dispatched.`;
+    // The point or the ends are in `detail`, so the same sentence is the same refusal.
+    super(message, message);
     this.name = 'PointerAimRefusedError';
     this.reason = reason;
   }

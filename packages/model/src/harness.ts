@@ -2562,7 +2562,10 @@ const EYES_MAX_TOKENS = 1_536;
  * replies that now finish. A ceiling bills nothing a finished reply does not
  * use. (Before: 1,000, not 600, because reasoning counts against it,
  * BrainMeasure M1 2026-10-02; the 4,096 runaway BrainMeasure measured that
- * day is the runaway above.)
+ * day is the runaway above.) The runaways were the brain answering in text
+ * with no tool offered; its model now answers through an offered tool
+ * ('tool_auto', see `StructuredOutputMode`), and on replayed brain prompts
+ * none ran away (0 of 213, 2026-10-14, against 14 of 213 in text).
  */
 const BRAIN_MAX_TOKENS = 3_000;
 

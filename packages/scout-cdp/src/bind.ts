@@ -46,6 +46,7 @@ export function bindAgent(page: CdpPage, options: BindingOptions): AgentDeps {
       camera,
       vision,
       ...(options.looksTaken === undefined ? {} : { taken: options.looksTaken }),
+      ...(options.maxLooks === undefined ? {} : { maxLooks: options.maxLooks }),
     }),
     siteCheckPort,
   );

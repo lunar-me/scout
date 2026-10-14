@@ -89,6 +89,7 @@ import {
   MAX_WAIT_SECONDS,
   MIN_WAIT_SECONDS,
   parseEnvelope,
+  RefusedActionError,
   toObservedAction,
   validateAction,
 } from './actions';
@@ -4203,8 +4204,7 @@ const RESERVED_EMAIL_DOMAIN = /@(?:[a-z0-9-]+\.)*(?:example\.(?:com|net|org)|[a-
  *
  * Also let through on a task that tells the run to fill in and submit a form,
  * or to complete the challenge, sign-up or quiz the page holds
- * ({@link TASK_FILLS_A_FORM}), when the field is one that form requires (marked
- * required in the tree, or labelled with an asterisk) and the address is on a
+ * ({@link TASK_FILLS_A_FORM}), when the address is on a
  * reserved test domain ({@link RESERVED_EMAIL_DOMAIN}), which no person's
  * mailbox can be at. BU Bench run 2026-10-13: 6 runs (`run_…`) told to fill in
  * a form's required fields and submit it, with no data given, had their
@@ -4218,7 +4218,13 @@ const RESERVED_EMAIL_DOMAIN = /@(?:[a-z0-9-]+\.)*(?:example\.(?:com|net|org)|[a-
  * failed on a question nobody answered. Production in the 30 days to
  * 2026-10-13 holds 20 refusals in 16 runs: 4 runs were such challenges, 9
  * were told to fill in a form, and 3 were a read-only x.com task, which stay
- * refused.
+ * refused. BU Bench run 3, 2026-10-14: two form tasks still had
+ * test@example.com refused (`run_…` on a shadow-DOM form, `run_…` on a
+ * rich-text form) because the field carried neither a required state nor an
+ * asterisk in our tree, and both failed after the park. So the field's
+ * required state is no longer asked: the task test is what keeps the
+ * discount box, the read-only sign-up task and every other task refused, and
+ * a reserved domain reaches no mailbox wherever it is typed.
  *
  * Everything else is refused at the dispatch site, before the page is
  * touched, with what to do instead.
@@ -4241,8 +4247,7 @@ export function inventedEmailRefusal(
     .toLowerCase();
   const invented = typed.find((address) => !given.includes(address.toLowerCase()));
   if (invented === undefined) return undefined;
-  const field = findNode(page, action.ref);
-  if (TASK_FILLS_A_FORM.test(task) && (field?.state?.required === true || /\*\s*$/.test(field?.name ?? ''))) {
+  if (TASK_FILLS_A_FORM.test(task)) {
     if (typed.every((address) => RESERVED_EMAIL_DOMAIN.test(address))) return undefined;
     return (
       `not performed: "${invented}" is an email address nobody gave you, at a domain that can be somebody\u2019s ` +
@@ -4514,18 +4519,10 @@ function readItems(body: unknown): readonly ReadItem[] {
   return entries.map((entry) => ({ text: entry, verdict: verdictOfText(entry) }));
 }
 
-/**
- * What a run a cap stopped before it answered returns: the items its reads
- * marked as meeting the task first, then the items they marked as not
- * meeting it with the reason the read gave, then whatever no read marked, and
- * the run's notes. Grouped, never filtered, and never re-judged: each verdict
- * is the read's own. See the call site in `runAgent`.
- */
-function stoppedReads(
-  stopReason: AgentStopReason | undefined,
-  findings: readonly Finding[],
+/** A run's distinct read items, grouped by the verdict each read gave them. */
+function groupedReads(
   reads: readonly { readonly step: number; readonly source: string; readonly body: unknown }[],
-): string {
+): Record<'met' | 'excluded' | 'unmarked', string[]> {
   const seen = new Set<string>();
   const groups: Record<'met' | 'excluded' | 'unmarked', string[]> = { met: [], excluded: [], unmarked: [] };
   for (const [index, read] of reads.entries()) {
@@ -4540,6 +4537,30 @@ function stoppedReads(
       groups[item.verdict ?? 'unmarked'].push(line);
     }
   }
+  return groups;
+}
+
+/** A stopped run's text, cut to {@link STOPPED_READS_CHARS} with the cut said. */
+function stoppedText(parts: readonly string[]): string {
+  const joined = parts.join('\n\n');
+  return joined.length > STOPPED_READS_CHARS
+    ? `${joined.slice(0, STOPPED_READS_CHARS)}\n[cut: ${String(STOPPED_READS_CHARS)} of ${String(joined.length)} characters]`
+    : joined;
+}
+
+/**
+ * What a run a cap stopped before it answered returns: the items its reads
+ * marked as meeting the task first, then the items they marked as not
+ * meeting it with the reason the read gave, then whatever no read marked, and
+ * the run's notes. Grouped, never filtered, and never re-judged: each verdict
+ * is the read's own. See the call site in `runAgent`.
+ */
+function stoppedReads(
+  stopReason: AgentStopReason | undefined,
+  findings: readonly Finding[],
+  reads: readonly { readonly step: number; readonly source: string; readonly body: unknown }[],
+): string {
+  const groups = groupedReads(reads);
   const parts = [
     `The run stopped (${stopReason ?? 'a cap'}) before it confirmed a complete answer, so the task is not ` +
       'finished: what is missing is whatever the items below do not cover. These are the items its page reads ' +
@@ -4549,10 +4570,66 @@ function stoppedReads(
   if (groups.excluded.length > 0) parts.push(`Checked and excluded (did not meet the task, as the read said):\n${groups.excluded.join('\n')}`);
   if (groups.unmarked.length > 0) parts.push(`Read but not marked either way:\n${groups.unmarked.join('\n')}`);
   if (findings.length > 0) parts.push(`What the run noted:\n${findings.map((finding) => `- ${finding.text}`).join('\n')}`);
-  const joined = parts.join('\n\n');
-  return joined.length > STOPPED_READS_CHARS
-    ? `${joined.slice(0, STOPPED_READS_CHARS)}\n[cut: ${String(STOPPED_READS_CHARS)} of ${String(joined.length)} characters]`
-    : joined;
+  return stoppedText(parts);
+}
+
+/**
+ * The stops that leave a refused draft standing as the run's answer (see
+ * {@link refusedDraft}): a ceiling the caller set, and an error or loop the
+ * loop stopped on. Not `gave-up`, whose `fail` is the model's later word on
+ * its own draft; not `cancelled`, which the caller chose; and not
+ * `account-exhausted`, which carries no failure, so a draft there would
+ * resolve `completed` without ever having been accepted.
+ */
+const DRAFT_STANDS: Partial<Record<AgentStopReason, true>> = {
+  error: true,
+  'loop-detected': true,
+  'max-steps': true,
+  'max-budget': true,
+  'max-duration': true,
+};
+
+/**
+ * The model's latest answer, when it is a `done` the loop refused: the last
+ * `done` with a summary that a door turned away (its step carries the refusal
+ * as `error`), with no answering extraction after it. That extraction, when
+ * there is one, is the model's later answer and already what `collected`
+ * holds.
+ */
+function refusedDraft(steps: readonly StepTrace[]): { readonly step: number; readonly summary: string } | undefined {
+  for (let index = steps.length - 1; index >= 0; index -= 1) {
+    const step = steps[index] as StepTrace;
+    const action = step.action;
+    if (action.type === 'extract' && answersTask(action) && step.held === undefined && step.error === undefined) {
+      return undefined;
+    }
+    const summary = action.type === 'done' ? (action.summary ?? '').trim() : '';
+    if (summary !== '' && step.error !== undefined) {
+      return { step: step.index, summary };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * What a run that stopped after a refused `done` returns: that draft, said to
+ * be one the loop did not accept, then what the run read after it, which the
+ * draft could not have used. See the call site in `runAgent`.
+ */
+function draftedAnswer(
+  stopReason: AgentStopReason,
+  draft: { readonly step: number; readonly summary: string },
+  later: readonly { readonly step: number; readonly source: string; readonly body: unknown }[],
+): string {
+  const parts = [
+    `Drafted answer, not accepted: the agent wrote this as its answer at step ${String(draft.step)}, the run ` +
+      `held it for more work, and the run then stopped (${stopReason}) before it accepted one.`,
+    draft.summary,
+  ];
+  const groups = groupedReads(later);
+  const lines = [...groups.met, ...groups.excluded, ...groups.unmarked];
+  if (lines.length > 0) parts.push(`Read after that draft, not reconciled with it:\n${lines.join('\n')}`);
+  return stoppedText(parts);
 }
 
 /**
@@ -6066,6 +6143,18 @@ export const STALL_FLOOR = 4;
  * again on a page that did not answer the first time is not.
  */
 export const STALL_REPEATS = 3;
+
+/**
+ * How many refusals of DIFFERENT targets ({@link RefusedActionError}) a run
+ * may take with no completed step between them before it stops on the last
+ * one. Twice the four the default `stepFailures: 3` stopped them at: the step
+ * after a run of one to three refusals worked 535 times in 572 in production
+ * (7 days to 2026-10-14), so four was cutting runs that were still finding
+ * their way; how often the fifth to eighth recover is not measured, because
+ * no run was ever allowed a fifth. A repeat of a refused target is charged to
+ * `stepFailures` instead, and an unchanged page still trips the stall stops.
+ */
+export const REFUSED_STEP_TOLERANCE = 8;
 
 /**
  * HOW MANY STEPS ON AN UNCHANGED PAGE THIS RUN CAN AFFORD, once it has started
@@ -8662,6 +8751,12 @@ export async function runAgent<T = unknown>(
    * consecutive rather than total.
    */
   let consecutiveFailures = 0;
+  /**
+   * Refusals since the last step that completed, and every target refused
+   * this run. See {@link RefusedActionError} and {@link REFUSED_STEP_TOLERANCE}.
+   */
+  let refusedInRow = 0;
+  const refusedTargets = new Set<string>();
   /**
    * Consecutive steps the focused tab's renderer did not answer a freeze
    * ({@link isRendererBusy}), and how many times this run has reopened a tab
@@ -13067,6 +13162,27 @@ export async function runAgent<T = unknown>(
           continue;
         }
       }
+      /**
+       * THE HOST DECLINED THE ACTION, and what it asked for was never sent:
+       * not charged to `stepFailures`, which is for a page that ignores what
+       * is sent. See {@link RefusedActionError} for the measurement. The step
+       * is recorded above, so the model reads the refusal on the next prompt.
+       *
+       * Two bounds instead. A target refused before is charged like any
+       * failure — the model was told and did it anyway. And past
+       * {@link REFUSED_STEP_TOLERANCE} refusals with no completed step between
+       * them the run stops on the last one, as the charge used to stop it at
+       * four.
+       */
+      if (error instanceof RefusedActionError && !refusedTargets.has(error.target)) {
+        refusedTargets.add(error.target);
+        refusedInRow += 1;
+        if (refusedInRow > REFUSED_STEP_TOLERANCE) {
+          stopReason = 'error';
+          break;
+        }
+        continue;
+      }
       consecutiveFailures += 1;
       // `null` tolerates no failure at all, which is a tolerance of zero.
       const tolerance = req.stepFailures ?? 0;
@@ -13123,6 +13239,7 @@ export async function runAgent<T = unknown>(
     if (parkedOn !== undefined) {
       record(traceOf(pending, index, clock.now() - stepStarted, isoTime(wallClock.now())));
       consecutiveFailures = 0;
+      refusedInRow = 0;
       busySteps = 0;
       failure = undefined;
       await parkForAnswer(parkedOn, index);
@@ -13150,6 +13267,7 @@ export async function runAgent<T = unknown>(
     const repeated = contradiction && contradicted.has(contradictionKey(pending.action));
     if (!contradiction) {
       consecutiveFailures = 0;
+      refusedInRow = 0;
       busySteps = 0;
     }
     failure = undefined;
@@ -14013,7 +14131,40 @@ export async function runAgent<T = unknown>(
    * and no answer of its own; a run that answered and then overspent keeps its
    * answer (the relabel below).
    */
-  if (cappedBy !== undefined && req.schema === undefined && !answerExtracted && reads.length > 1) {
+  /**
+   * A RUN STOPPED AFTER IT WROTE AN ANSWER THE LOOP HELD returns that answer.
+   *
+   * A refused `done` keeps its summary only on its step, and `collected` goes
+   * on holding whatever the run extracted, so a run that drafted its answer,
+   * was held for more work and then stopped on an error or a ceiling returned
+   * its raw reads instead of it. MEASURED, production `run_records` and
+   * `agent_runs`, 30 days to 2026-10-14, schema-less runs that stopped
+   * `error`, `max-budget` or `max-steps` after a refused `done` with a
+   * summary (n=160): 14 had answered after it and were relabelled
+   * `max-budget`, 2 had answered by a final extraction since; of the other
+   * 144, 106 returned an extraction dump (48 the "Partial extraction
+   * observations" text, 58 a bare read), 21 nothing, and 17 the draft with
+   * nothing saying it was one. `run_…` (2026-10-13) drafted its whole answer
+   * at step 26, was held for one open sub-goal, stopped `error` at step 33 on
+   * three incomplete reads, and returned those reads. Now the latest refused
+   * draft is the data, said to be a draft the loop did not accept, followed by
+   * what was read after it. The stop reason and `error` are unchanged, and so
+   * is the status but where nothing else was collected: `partial`, not
+   * `failed`, because a draft came back. Not on a resumable loss
+   * (`browserLost`, `exitSwitch`): the resumed attempt carries `data` on.
+   */
+  const draft =
+    req.schema === undefined &&
+    stopReason !== undefined &&
+    DRAFT_STANDS[stopReason] === true &&
+    (cappedBy !== undefined || failure !== undefined) &&
+    browserLost === undefined &&
+    exitSwitch === undefined
+      ? refusedDraft(steps)
+      : undefined;
+  if (draft !== undefined && stopReason !== undefined) {
+    collected = draftedAnswer(stopReason, draft, reads.filter((read) => read.step > draft.step));
+  } else if (cappedBy !== undefined && req.schema === undefined && !answerExtracted && reads.length > 1) {
     collected = stoppedReads(stopReason, findings, reads);
   }
 

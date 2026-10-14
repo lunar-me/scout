@@ -111,6 +111,12 @@ export interface BindingOptions {
    * limit holds per RUN across re-acquisition and resume. Absent is zero.
    */
   readonly looksTaken?: number;
+  /**
+   * How many looks this run may make in all: `lookAllowance(caps.budget)`
+   * from `@outcrawl/runtime` on a host that bills in credits. Absent is that
+   * module's `DEFAULT_LOOKS_PER_RUN`.
+   */
+  readonly maxLooks?: number;
   /** Monotonic, for the dwell inside a gesture plan. Defaults to core's `systemClock`. */
   readonly clock?: Clock;
   /**

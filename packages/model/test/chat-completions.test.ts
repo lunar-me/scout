@@ -57,6 +57,7 @@ const ROUTED: ProviderRouting = { order: [], ignore: () => [] };
 const MODES: Readonly<Record<string, StructuredOutputMode>> = {
   'planner-model': 'tool_choice',
   'brain-model': 'json_object',
+  'thinking-model': 'tool_auto',
 };
 const outputMode = (model: string): StructuredOutputMode => MODES[model] ?? 'strict';
 
@@ -714,6 +715,29 @@ describe("'tool_choice' mode: the request", () => {
 
     const request = sent[0] as { body: { messages: readonly { role: string; content: string }[] } };
     expect(request.body.messages[0]).toEqual({ role: 'system', content: REQUEST.system });
+  });
+});
+
+/**
+ * 'tool_auto': the same one tool, offered, because a model that reasons
+ * refuses a forced call. MUTATIONS THIS CATCHES: the call forced (unroutable
+ * with thinking), `response_format` sent beside the tool, and a system message
+ * that never says the tool is how to answer.
+ */
+describe("'tool_auto' mode: the request", () => {
+  test('offers the single function tool with tool_choice auto, no response_format, and says to call it', async () => {
+    const { post, sent } = posting(ok({ prompt_tokens: 10, completion_tokens: 5 }));
+    await gateway({ httpPost: post, outputMode, routing: ROUTED }).complete({ ...REQUEST, model: 'thinking-model' });
+
+    const request = sent[0] as { body: Record<string, unknown> & { messages: readonly { role: string; content: string }[] } };
+    expect(request.body['response_format']).toBeUndefined();
+    expect(request.body['tools']).toMatchObject([{ type: 'function', function: { name: 'outcrawl_reply', parameters: REQUEST.schema } }]);
+    expect((request.body['tools'] as readonly unknown[]).length).toBe(1);
+    expect(request.body['tool_choice']).toBe('auto');
+    expect(request.body['provider']).toEqual({ require_parameters: true });
+    const system = request.body.messages[0]?.content ?? '';
+    expect(system.startsWith(REQUEST.system)).toBe(true);
+    expect(system).toContain('outcrawl_reply');
   });
 });
 

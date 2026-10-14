@@ -393,16 +393,46 @@ describe('an email address nobody gave the run is never typed into a page', () =
     expect(result.steps[0]?.error).toContain('use one at example.com');
   });
 
-  test('on a form task a box the form does not require is still refused', async () => {
+  /**
+   * A form drawn inside a shadow root, as BU Bench run 3 met it (2026-10-14,
+   * run_…): the email field reached the tree with no required state and no
+   * asterisk in its name.
+   */
+  const shadowForm = tree(
+    node({
+      role: 'RootWebArea',
+      name: 'Contact us',
+      children: [
+        node({ role: 'textbox', name: 'Full Name' }),
+        node({ role: 'textbox', name: 'Email' }),
+        node({ role: 'button', name: 'Submit' }),
+      ],
+    }),
+    'https://contact.test/',
+  );
+  const shadowTask = 'Go to the page and complete the contact form by filling in all required fields and submitting.';
+
+  test('on a form task a test-domain address is typed into a field the tree does not mark required', async () => {
+    const fill: Action = { type: 'fill', ref: refOf(shadowForm, 'Email'), text: 'test@example.com' };
+    const h = harness({ tree: shadowForm, model: script({ action: fill }) });
+
+    const result = await runAgent(h.deps, { task: shadowTask, caps: CAPS, stepFailures: null });
+
+    expect(h.performed).toEqual([fill]);
+    expect(result.steps[0]?.error).toBeUndefined();
+  });
+
+  test('on a form task a real domain in a field the tree does not mark required is refused, pointing at example.com', async () => {
     const h = harness({
-      tree: signup,
-      model: script({ action: { type: 'fill', ref: refOf(signup, 'Get our newsletter'), text: 'jane.doe@example.com' } }),
+      tree: shadowForm,
+      model: script({ action: { type: 'fill', ref: refOf(shadowForm, 'Email'), text: 'test@gmail.com' } }),
     });
 
-    const result = await runAgent(h.deps, { task: fillTask, caps: CAPS, stepFailures: null });
+    const result = await runAgent(h.deps, { task: shadowTask, caps: CAPS, stepFailures: null });
 
     expect(h.performed).toEqual([]);
-    expect(result.steps[0]?.error).toContain('close it with its close control or Escape');
+    expect(result.steps[0]?.error).toContain('"test@gmail.com"');
+    expect(result.steps[0]?.error).toContain('use one at example.com');
   });
 
   /** A puzzle page whose first level is a form of required personal fields. */
@@ -431,18 +461,16 @@ describe('an email address nobody gave the run is never typed into a page', () =
     expect(result.steps[0]?.error).toBeUndefined();
   });
 
-  test('on a challenge task a real domain and a stray box are still refused', async () => {
-    for (const [field, text, says] of [
-      ['Email *', 'john.smith@gmail.com', 'use one at example.com'],
-      ['Get our newsletter', 'john.smith@example.com', 'close it with its close control or Escape'],
-    ] as const) {
-      const h = harness({ tree: challenge, model: script({ action: { type: 'fill', ref: refOf(challenge, field), text } }) });
+  test('on a challenge task a real domain is still refused', async () => {
+    const h = harness({
+      tree: challenge,
+      model: script({ action: { type: 'fill', ref: refOf(challenge, 'Email *'), text: 'john.smith@gmail.com' } }),
+    });
 
-      const result = await runAgent(h.deps, { task: challengeTask, caps: CAPS, stepFailures: null });
+    const result = await runAgent(h.deps, { task: challengeTask, caps: CAPS, stepFailures: null });
 
-      expect(h.performed).toEqual([]);
-      expect(result.steps[0]?.error).toContain(says);
-    }
+    expect(h.performed).toEqual([]);
+    expect(result.steps[0]?.error).toContain('use one at example.com');
   });
 
   test('a task that reads a sign-up page and does not complete it still refuses the address', async () => {
