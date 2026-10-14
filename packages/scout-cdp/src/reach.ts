@@ -197,5 +197,7 @@ export const HIT_WINDOW_PX = 6;
 /** An element's tag and attributes, as `DOM.describeNode` reports them. */
 export interface DescribedElement {
   readonly tag: string;
+  /** The node is text (`nodeType` 3), not an element. */
+  readonly text: boolean;
   attribute(key: string): string | undefined;
 }

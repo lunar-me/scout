@@ -39,19 +39,19 @@
  * {@link WrongTabRefError} for why that refusal names the tab.
  */
 import { DEFAULT_MIN_TEXT_LENGTH, isRecord, optionAliases, systemClock, type JsonSchema } from '@outcrawl/scout-core';
-import { MAX_DRAG_PX, MIN_DRAG_PX, filterTree, findNode, formatNodeRef, framedInstruction, heldPrivately, isReloadKey, isViewportPoint, nativeDateKeys, nativeDateKind, nativeDateRuns, nativeDateValue, nodeRef, walk, type Action, type AgentDeps, type AgentPrompt, type AxNode, type AxTree, type DragAction, type DragEnd, type ExtractBound, type ExtractContent, type ExtractOutcome, type ExtractSelection, type LookCamera, type LookShot, type NativeDateKind, type RefusedSubmit, type ModelChoice, type NodeRef, type PerformOutcome, type SiteCheckResult, type SiteCheckSighting, type TextCaptchaSighting, type ViewportPoint } from '@outcrawl/runtime';
+import { ACTIONABLE_ROLES, MAX_DRAG_PX, MIN_DRAG_PX, filterTree, findNode, formatNodeRef, framedInstruction, heldPrivately, isReloadKey, isViewportPoint, nativeDateKeys, nativeDateKind, nativeDateRuns, nativeDateValue, nodeRef, walk, type Action, type AgentDeps, type AgentPrompt, type AxNode, type AxTree, type DragAction, type DragEnd, type ExtractBound, type ExtractContent, type ExtractOutcome, type ExtractSelection, type LookCamera, type LookShot, type NativeDateKind, type RefusedSubmit, type ModelChoice, type NodeRef, type PerformOutcome, type SiteCheckResult, type SiteCheckSighting, type TextCaptchaSighting, type ViewportPoint } from '@outcrawl/runtime';
 import { axTreeFromCdp, frameOrdinalsOf } from './ax-tree';
 import { isCdpTimeout, type CdpPage } from './cdp';
 import { readDocument } from './document';
 import { pageCamera } from './camera';
-import { ancestorsOf, descendantsOf, documentClip, elementOf, hitAt, inLookWorld, onScreenPart, reachable, scrollPosition, viewport } from './page-reads';
+import { ancestorsOf, descendantsOf, documentClip, elementOf, hitAt, inLookWorld, lookWorldList, onScreenPart, reachable, scrollPosition, viewport } from './page-reads';
 import { childFrameIds } from './frames';
 import { outcrawlFlavor } from './flavor';
 import type { LoadRequest, LoadResult, ShotRegion, TabHooks } from './hooks';
 import type { BindingOptions } from './options';
 import { dialogReadMs } from './dialog';
 import { DRAG_OVER_INTERVAL_MS, DRAG_START_WAIT_MS, liftOf, type Html5DragArm } from './drag';
-import { NoModelError, CoveredTargetError, CrossFrameRefError, DISABLEABLE_TAGS, DisabledTargetError, FileInputClickError, FilesUnavailableError, HandsUnavailableError, NativeSelectPopupError, OffScreenTargetError, PointerAimRefusedError, UnmeasurableTargetError, UnperformableActionError, opensPopupMenu, overlayAccount, type CoverAccount, type Hit, type ShownNode } from './errors';
+import { NoModelError, CoveredTargetError, CrossFrameRefError, DISABLEABLE_TAGS, DisabledTargetError, FileInputClickError, FilesUnavailableError, HandsUnavailableError, NativeSelectPopupError, OffScreenTargetError, PointerAimRefusedError, TextTargetError, UnmeasurableTargetError, UnperformableActionError, opensPopupMenu, overlayAccount, type CoverAccount, type Hit, type ShownNode } from './errors';
 import { DEFAULT_LOCK_TIMEOUT_MS, ERROR_PAGE_PREFIX, FREEZE_REPLY_DEADLINE_MS, FreezeNotAnsweredError, LOADING_HOLDS_BEFORE_TURN, NAVIGATION_FREEZE_HOLD_MS, StillLoadingError, UNANSWERED_RELEASE_WAIT_MS, heldFreezes, within } from './freeze';
 import type { HandsContext, HandsPort, HandsStep, HandsTarget, PointerSample } from './hands';
 import { selfReleases, sendUntilForwarded } from './input';
@@ -60,7 +60,7 @@ import { pdfDocuments, pdfMarkdown, pdfNotice } from './pdf-document';
 import { textDocumentMarkdown, textDocumentNotice, textDocumentWindow, textDocuments, type TextDocumentRead } from './text-document';
 import { topFrameWatch } from './top-frame';
 import { HIT_SAMPLES, HIT_WINDOW_PX, LANDING_DRAWS, LIST_OPTION_POLL_MS, LIST_OPTION_ROLES, LIST_OPTION_WAIT_MS, LIST_SELECT_SETTLE_MS, MAX_REACH_GESTURE_PX, MAX_REACH_TOTAL_PX, MAX_SCROLLS_TO_REACH, MIN_HITTABLE_PX, PAINTED_DESCENDANT_DEPTH, PAINTED_DESCENDANT_READS, PAINTED_RUN_STEPS, POINT_AIM_PX, REST_EPSILON_PX, SCROLL_PROGRESS_PX, SCROLL_REST_POLL_MS, SCROLL_REST_TIMEOUT_MS, TYPED_LIST_ROLES, normalisedName, textOutsideLists } from './reach';
-import { CLIPPING_SCROLLER, DISMISS_NAME, FILE_INPUT_NEAR, FIXED_OF, FOCUS_TAKES_TEXT, LABELLED_CONTROL_TYPES, MAX_DISMISS_CHECKS, MAX_DISMISS_NAMED, MAX_MIXED_LABEL_READS, MAX_NATIVE_DATE_READS, MODAL_OF, NATIVE_DATE_HOST, NATIVE_DATE_LAYOUT, SAME_CONTROL, SELECT_OF, asShown, clipFrom, nativeSelect, refusedSubmit } from './scripts';
+import { CLIPPING_SCROLLER, DISMISS_NAME, EDITABLE_FIELD_WIDTH, EDITABLE_FIELDS, EDITABLE_HOST, FILE_INPUT_NEAR, FIXED_OF, FOCUS_TAKES_TEXT, LABELLED_CONTROL_TYPES, MAX_DISMISS_CHECKS, MAX_DISMISS_NAMED, MAX_MIXED_LABEL_READS, MAX_NATIVE_DATE_READS, MODAL_OF, NATIVE_DATE_HOST, NATIVE_DATE_LAYOUT, SAME_CONTROL, SELECT_OF, asShown, clipFrom, nativeSelect, refusedSubmit } from './scripts';
 
 /**
  * The `Outcrawl.getAXTree` node ceiling this binding asks for, well above the
@@ -246,6 +246,45 @@ async function asWritten<T>(written: string, revealed: string, act: () => Promis
     }
     throw error;
   }
+}
+
+/**
+ * `tree` without the text a person does not see because it is painted fully
+ * transparent (`paintHidden`: `opacity: 0` on it or an ancestor, which the
+ * accessibility tree keeps), with one line first saying how many lines went.
+ * Controls stay, painted or not: a transparent checkbox under its styled label
+ * is still the one a key or a label press reaches. What the tree already
+ * leaves out stays out (`display: none`, `visibility: hidden`, `hidden`,
+ * `aria-hidden`, closed `<details>`), and screen-reader-only text, which is
+ * painted, stays in.
+ *
+ * MEASURED: dev it-07.r1 (2026-10-14, live build), an extract before any key
+ * was pressed returned the page's transparent "completed successfully" line
+ * as its status, and the run finished on a page that had not succeeded; the
+ * tree it read marked the line not painted, and the extraction model reported
+ * it anyway. Stock Chromium the same day: 5 of the 18 InteractionTests dev
+ * pages hold their success line at `opacity: 0` from load, each `paintHidden`.
+ */
+function withoutUnpaintedText(tree: AxTree): AxTree {
+  const unpainted = (node: AxNode): boolean => node.state?.paintHidden === true && !ACTIONABLE_ROLES.has(node.role);
+  if (!walk(tree).some(unpainted)) return tree;
+  let dropped = 0;
+  const kept = (node: AxNode): AxNode[] => {
+    const children = node.children?.flatMap(kept);
+    if (unpainted(node)) {
+      if ((node.name ?? '').trim() !== '') dropped += 1;
+      return children ?? [];
+    }
+    return [children === undefined ? node : { ...node, children }];
+  };
+  const children = (tree.root.children ?? []).flatMap(kept);
+  const notice: AxNode = {
+    ref: tree.root.ref,
+    role: 'StaticText',
+    name: `[${String(dropped)} text ${dropped === 1 ? 'line' : 'lines'} not shown on screen (fully transparent) left out; a page may show such text after an action or on scroll]`,
+    xpath: '',
+  };
+  return { ...tree, root: { ...tree.root, children: dropped === 0 ? children : [notice, ...children] } };
 }
 
 export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
@@ -1179,11 +1218,11 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
     // Before `withoutParked`, which resolves refs through `sessionFor`.
     tabFrames = frameOrdinalsOf(reply);
     forgetFrameOwners();
-    const resolved = await withNativeDateFields(await withRadioLabelsResolved(tree));
+    const resolved = await withEditableFields(await withNativeDateFields(await withRadioLabelsResolved(tree)));
     const shown = parked.size === 0 && covered.size === 0 ? resolved : await withoutParked(resolved);
     if (!conceal) return shown;
     // Before the mask, so a secret the PDF's title might hold is concealed too.
-    const noted = await withPdfNotice(shown);
+    const noted = await withPdfNotice(withoutUnpaintedText(shown));
     const mask = tab?.masking?.tree;
     return mask === undefined ? noted : await mask(noted);
   }
@@ -1272,6 +1311,92 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
       return own.children === undefined ? own : { ...own, children: own.children.map(mark) };
     };
     return { ...tree, root: mark(tree.root) };
+  }
+
+  /**
+   * `tree` with a `textbox` for each editable region of the top document that
+   * it shows no field for: see `EDITABLE_FIELDS`. Each goes where the region
+   * is in the page — before the first of its own text the tree shows, else
+   * after the text before it, else last — named as a person reads it, its text
+   * as its value, so a fill is checked against what it holds.
+   *
+   * Blink maps a `contenteditable` with no role to `generic`, and the tree's
+   * filter drops that role, so the model was shown a form's text and no field.
+   * MEASURED: dev it-17.r1 (2026-10-14, live build), a contenteditable form
+   * whose brief listed the submit button as its only element; the hands put
+   * `fill email` on the text "Select country..." twice ("DOM.focus failed: Node
+   * is not an Element", steps 2 and 13). BU Bench final run 27C: a Quill editor
+   * shown only as its placeholder text, filled and clicked through a node that
+   * no longer existed. Stock Chromium, 2026-10-14: that form's two editable
+   * fields read `generic`, `editable: richtext`, and are absent from the tree.
+   *
+   * One look-world read per snapshot, page-invisible; two round trips on a
+   * page with no `contenteditable`. Frames below the top document are not
+   * read. The tree's root is this session's own frame, whose id is read once:
+   * a tab's main frame keeps its id across navigations.
+   */
+  let topFrameId: string | undefined;
+  async function withEditableFields(tree: AxTree): Promise<AxTree> {
+    let listed: readonly (number | string | null)[] | undefined;
+    try {
+      if (topFrameId === undefined) {
+        const top = (await page.send('Page.getFrameTree'))['frameTree'];
+        const frame = typeof top === 'object' && top !== null && 'frame' in top ? top.frame : undefined;
+        const id = typeof frame === 'object' && frame !== null && 'id' in frame ? frame.id : undefined;
+        if (typeof id !== 'string' || id === '') return tree;
+        topFrameId = id;
+      }
+      listed = await lookWorldList(page, topFrameId, EDITABLE_FIELDS);
+    } catch {
+      // A document this read cannot reach keeps the tree as the browser gave
+      // it, and the frame is read again next time.
+      topFrameId = undefined;
+      return tree;
+    }
+    if (listed === undefined) return tree;
+    const own = tree.root.ref.frameOrdinal;
+    const shown = new Set(walk(tree).map((node) => formatNodeRef(node.ref)));
+    const keyOf = (item: number | string | null | undefined): string | undefined => {
+      if (typeof item !== 'number') return undefined;
+      const key = formatNodeRef(nodeRef(own, item));
+      return shown.has(key) ? key : undefined;
+    };
+    const before = new Map<string, AxNode[]>();
+    const after = new Map<string, AxNode[]>();
+    const last: AxNode[] = [];
+    const add = (into: Map<string, AxNode[]>, key: string, field: AxNode): void => {
+      into.set(key, [...(into.get(key) ?? []), field]);
+    };
+    for (let at = 0; at + EDITABLE_FIELD_WIDTH <= listed.length; at += EDITABLE_FIELD_WIDTH) {
+      const [root, first, prior1, prior2, prior3, name, value, id] = listed.slice(at, at + EDITABLE_FIELD_WIDTH);
+      // Already a field in the tree: a region with `role=textbox`, as Lexical
+      // and Draft.js give theirs, is shown by the browser itself.
+      if (typeof root !== 'number' || keyOf(root) !== undefined) continue;
+      const field: AxNode = {
+        ref: nodeRef(own, root),
+        role: 'textbox',
+        xpath: typeof id === 'string' && !id.includes('"') && id.length <= 200 ? `//*[@id="${id}"]` : '',
+        ...(typeof name === 'string' && name !== '' ? { name } : {}),
+        ...(typeof value === 'string' && value !== '' ? { value } : {}),
+      };
+      const inside = keyOf(first);
+      const prior = keyOf(prior1) ?? keyOf(prior2) ?? keyOf(prior3);
+      if (inside !== undefined) add(before, inside, field);
+      else if (prior !== undefined) add(after, prior, field);
+      else last.push(field);
+    }
+    if (before.size === 0 && after.size === 0 && last.length === 0) return tree;
+    const place = (node: AxNode): AxNode => {
+      if (node.children === undefined) return node;
+      const children: AxNode[] = [];
+      for (const child of node.children) {
+        const key = formatNodeRef(child.ref);
+        children.push(...(before.get(key) ?? []), place(child), ...(after.get(key) ?? []));
+      }
+      return { ...node, children };
+    };
+    const placed = place(tree.root);
+    return { ...tree, root: last.length === 0 ? placed : { ...placed, children: [...(placed.children ?? []), ...last] } };
   }
 
   /**
@@ -3266,7 +3391,33 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
     // a payment provider's iframe under it included.
     const masking = tab?.masking;
     const text = masking?.reveal === undefined ? written : await masking.reveal(written, ref);
-    const { page: session, backendNodeId: id } = await sessionFor(ref);
+    const { page: session, backendNodeId: named } = await sessionFor(ref);
+    const namedElement = await elementOf(session, named).catch(() => undefined);
+    // TEXT INSIDE A FIELD IS TYPED INTO THE FIELD. A node that takes typing
+    // itself (a native field, an editable region's root, a text-field role)
+    // is typed into as named. Anything else is resolved, in the look world, to
+    // the editable region it is in or the text field enclosing it: a rich-text
+    // editor's paragraph or text, a placeholder's text. Text that no field
+    // encloses is refused rather than handed to `DOM.focus`, whose "Node is not
+    // an Element" told the model nothing (dev it-17.r1, 2026-10-14). An element
+    // with no field around it is typed into as before.
+    let id = named;
+    const editable = namedElement?.attribute('contenteditable');
+    if (
+      namedElement !== undefined &&
+      (namedElement.text || namedElement.tag !== '') &&
+      !/^(input|textarea|select)$/.test(namedElement.tag) &&
+      (editable === undefined || editable === 'false') &&
+      !/^(textbox|searchbox|combobox|spinbutton)$/.test(namedElement.attribute('role') ?? '')
+    ) {
+      const frameId = await frameIdOf(session, ref).catch(() => undefined);
+      const host =
+        frameId === undefined
+          ? undefined
+          : await inLookWorld(session, frameId, { on: named, declaration: EDITABLE_HOST, returns: 'node' }).catch(() => undefined);
+      if (typeof host === 'number') id = host;
+      else if (namedElement.text) throw new TextTargetError('fill', ref);
+    }
     // A field about to hold a secret is registered BEFORE its first keystroke,
     // so no capture of this tab — replay frame, vision screenshot, look — shows
     // it unmasked, and the live view stops streaming the tab (`capture-mask.ts`,
@@ -3277,7 +3428,7 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
     // (`MenuListSelectType::ShouldOpenPopupForKeyPressEvent`,
     // `LayoutThemeMac::PopsMenuByArrowKeys`), and that menu wedges the browser
     // (see `NativeSelectPopupError`). Filling one means choosing what it names.
-    const element = await elementOf(session, id).catch(() => undefined);
+    const element = id === named ? namedElement : await elementOf(session, id).catch(() => undefined);
     if (element !== undefined && opensPopupMenu(element)) {
       await asWritten(written, text, () => performSelect(ref, text));
       return;

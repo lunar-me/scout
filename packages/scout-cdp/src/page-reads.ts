@@ -227,6 +227,56 @@ export async function inLookWorld(
   }
 }
 
+/**
+ * `expression` evaluated in an isolated world of `frameId`: the array it
+ * returns, each node in it as its backend id and each other item as its value
+ * (`null` for anything that is neither a node nor a string or number).
+ * `undefined` when it returned no array or threw. The same world
+ * {@link inLookWorld} reads in; the page's own script sees none of it. Two
+ * round trips when the expression returns no array.
+ */
+export async function lookWorldList(session: CdpPage, frameId: string, expression: string): Promise<readonly (number | string | null)[] | undefined> {
+  const world = await session.send('Page.createIsolatedWorld', {
+    frameId,
+    worldName: LOOK_WORLD,
+    grantUniveralAccess: false,
+  });
+  const contextId = world['executionContextId'];
+  if (typeof contextId !== 'number') return undefined;
+  const evaluated = await session.send('Runtime.evaluate', {
+    expression,
+    contextId,
+    objectGroup: LOOK_OBJECT_GROUP,
+    returnByValue: false,
+  });
+  const result = evaluated['result'];
+  if (typeof result !== 'object' || result === null || !('objectId' in result) || typeof result.objectId !== 'string') return undefined;
+  const arrayId = result.objectId;
+  try {
+    if (evaluated['exceptionDetails'] !== undefined || !('subtype' in result) || result.subtype !== 'array') {
+      return undefined;
+    }
+    const listed = (await session.send('Runtime.getProperties', { objectId: arrayId, ownProperties: true }))['result'];
+    const items: { index: number; item: number | string | null }[] = [];
+    for (const property of Array.isArray(listed) ? (listed as unknown[]) : []) {
+      if (typeof property !== 'object' || property === null) continue;
+      const { name, value } = property as { name?: unknown; value?: unknown };
+      if (typeof name !== 'string' || !/^\d+$/.test(name) || typeof value !== 'object' || value === null) continue;
+      let item: number | string | null = null;
+      if ('objectId' in value && typeof value.objectId === 'string' && 'subtype' in value && value.subtype === 'node') {
+        const node = (await session.send('DOM.describeNode', { objectId: value.objectId }))['node'];
+        item = typeof node === 'object' && node !== null && 'backendNodeId' in node && typeof node.backendNodeId === 'number' ? node.backendNodeId : null;
+      } else if ('value' in value && (typeof value.value === 'string' || typeof value.value === 'number')) {
+        item = value.value;
+      }
+      items.push({ index: Number(name), item });
+    }
+    return items.sort((a, b) => a.index - b.index).map(({ item }) => item);
+  } finally {
+    await session.send('Runtime.releaseObjectGroup', { objectGroup: LOOK_OBJECT_GROUP }).catch(() => undefined);
+  }
+}
+
 /** One element's tag and attributes, read with `DOM.describeNode`. */
 export async function elementOf(session: CdpPage, backendNodeId: number): Promise<DescribedElement | undefined> {
   const described = await session.send('DOM.describeNode', { backendNodeId });
@@ -240,7 +290,7 @@ export async function elementOf(session: CdpPage, backendNodeId: number): Promis
     const value = list[at + 1];
     if (typeof key === 'string' && typeof value === 'string') attributes.set(key, value);
   }
-  return { tag, attribute: (key) => attributes.get(key) };
+  return { tag, text: 'nodeType' in node && node.nodeType === 3, attribute: (key) => attributes.get(key) };
 }
 
 /**

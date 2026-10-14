@@ -50,10 +50,18 @@ export function asShown(node: AxNode): ShownNode {
  * `this` is the click's target, `cover` what the hit test named instead:
  * whether a press on `cover` is a press on the target's own control. See
  * `sameControlAs` in {@link agentDepsFor}. Runs in the look world; reads only.
+ *
+ * A text node is never what the hit test names: a point on its glyphs names
+ * the element the text is in, so that element is the text's own paint and not
+ * a cover. MEASURED: dev it-17 (2026-10-14, 5 runs on the live build and on
+ * ws/editable-fix), all 20 clicks on a custom radio's option text (in a plain
+ * `<span>` inside the clickable option) were refused as covered by that
+ * `<span>`, and the form never submitted; reproduced on stock Chromium.
  */
 export const SAME_CONTROL = `function (cover) {
   var target = this;
   if (cover.nodeType !== 1 || (target.nodeType !== 1 && target.nodeType !== 3)) return false;
+  if (target.nodeType === 3 && target.parentNode === cover) return true;
   var label = cover.closest('label');
   if (label !== null && label.control === target) return true;
   var CONTROL = 'a[href],area[href],button,input,select,textarea,summary,label,iframe,[contenteditable],[tabindex],' +
@@ -432,6 +440,86 @@ export const CLIPPING_SCROLLER = `function () {
     return { x: left, y: top, width: right - left, height: bottom - top, dx: dx, dy: dy };
   }
   return null;
+}`;
+
+/** How many editable regions one read of a document lists. */
+export const MAX_EDITABLE_FIELDS = 24;
+
+/** The values {@link EDITABLE_FIELDS} reads per region, in order. */
+export const EDITABLE_FIELD_WIDTH = 8;
+
+/**
+ * Every editable region of the document a person can see and type in, which
+ * the accessibility tree does not show as a field: a `contenteditable` element
+ * whose parent is not editable (the region's own root, the element a rich-text
+ * editor such as Quill, ProseMirror or Lexical types into). Blink maps one with
+ * no role to `generic`, which the tree's filter drops, so the model is shown
+ * only the text around it, a placeholder's included, and a fill lands on that
+ * text. An expression for `lookWorldList`, run in the look world; reads only.
+ *
+ * Per region, {@link EDITABLE_FIELD_WIDTH} values: the root, its first text
+ * node, the three text nodes before it in document order (where it goes in the
+ * tree when it holds no text the tree shows), the name a person reads for it
+ * (its ARIA name, its `<label for>`, an enclosing label, then its placeholder),
+ * its text, and its `id`. `null` when there is none.
+ */
+export const EDITABLE_FIELDS = `(function () {
+  var all = document.querySelectorAll('[contenteditable]');
+  if (all.length === 0) return null;
+  var squash = function (text, max) { text = (text || '').replace(/\\s+/g, ' ').trim(); return text.length > max ? text.slice(0, max) : text; };
+  var shown = function (node) {
+    var up = node.parentElement;
+    return up !== null && !/^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/.test(up.tagName) && /\\S/.test(node.data) && up.getClientRects().length > 0;
+  };
+  var out = [];
+  for (var i = 0; i < all.length && out.length < ${String(MAX_EDITABLE_FIELDS * EDITABLE_FIELD_WIDTH)}; i += 1) {
+    var root = all[i];
+    if (!root.isContentEditable || (root.parentElement !== null && root.parentElement.isContentEditable)) continue;
+    var box = root.getBoundingClientRect();
+    if (box.width < 1 || box.height < 1 || getComputedStyle(root).visibility !== 'visible') continue;
+    var inside = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    var first = null;
+    while (first === null && inside.nextNode() !== null) if (shown(inside.currentNode)) first = inside.currentNode;
+    var before = [];
+    var back = document.createTreeWalker(document.documentElement, NodeFilter.SHOW_TEXT);
+    back.currentNode = root;
+    for (var hops = 0; before.length < 3 && hops < 64 && back.previousNode() !== null; hops += 1) {
+      if (shown(back.currentNode)) before.push(back.currentNode);
+    }
+    var name = root.getAttribute('aria-label') || '';
+    var by = root.getAttribute('aria-labelledby');
+    if (name === '' && by) {
+      name = by.split(/\\s+/).map(function (id) { var el = document.getElementById(id); return el === null ? '' : el.textContent; }).join(' ');
+    }
+    if (squash(name, 1) === '' && root.id) {
+      var labels = document.querySelectorAll('label[for="' + CSS.escape(root.id) + '"]');
+      if (labels.length > 0) name = labels[0].textContent;
+    }
+    if (squash(name, 1) === '' && root.closest('label') !== null) name = root.closest('label').textContent;
+    if (squash(name, 1) === '') {
+      name = root.getAttribute('aria-placeholder') || root.getAttribute('placeholder') || root.getAttribute('data-placeholder') || root.getAttribute('title') || '';
+    }
+    out.push(root, first, before[0] || null, before[1] || null, before[2] || null, squash(name, 120), squash(root.innerText, 4000), root.id || null);
+  }
+  return out.length === 0 ? null : out;
+})()`;
+
+/**
+ * Called on the node a `fill` named when it is not itself something that
+ * takes typing: the root of the editable region it is in (see
+ * {@link EDITABLE_FIELDS}), else the nearest enclosing element that is a text
+ * field by role, else `null`. A text node inside a rich-text editor, its
+ * paragraph, or a placeholder's text: the field is the region around it. Runs
+ * in the look world; reads only.
+ */
+export const EDITABLE_HOST = `function () {
+  var element = this.nodeType === 1 ? this : this.parentElement;
+  if (element === null) return null;
+  if (element.isContentEditable) {
+    while (element.parentElement !== null && element.parentElement.isContentEditable) element = element.parentElement;
+    return element;
+  }
+  return element.closest('[role=textbox],[role=searchbox]');
 }`;
 
 /** {@link CLIPPING_SCROLLER}'s answer, checked. */

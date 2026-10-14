@@ -763,14 +763,18 @@ export interface ToolCallOutcome {
    * A line the run may KEEP: recorded on the step (`StepTrace.tool.note`,
    * cut at {@link MAX_TOOL_NOTE_CHARS}) where {@link text} never is. Set only
    * by a port whose reply is the HOST's account of its own work — what it
-   * found, what it did, what the page answered — and carries nothing it read
-   * on the customer's behalf: `page.verify`. A connector's reply is a
-   * mailbox, so a connector port never sets it (see {@link AgentPrompt.toolResults}).
+   * found, what it did, what the page answered — or a public page the run
+   * fetched for itself: `page.verify`, `page.look`, and `web.read` /
+   * `web.search` (the final URL and the start of what the reply said). A
+   * connector's reply is a mailbox, so a connector port never sets it (see
+   * {@link AgentPrompt.toolResults}).
    *
    * Why it exists: Stealth Bench 2026-10-06, `run_…` task 43, three
    * `page.verify` calls recorded only "reported an error; its reply is in the
    * tool results block of the next prompt", and the reply that would have
-   * named the cause was gone with the prompt.
+   * named the cause was gone with the prompt. The web tools' notes: two
+   * dev-set answers taken from `web.read` were judged unsupported because the
+   * record showed nothing the read returned (2026-10-14).
    */
   readonly note?: string;
 }
@@ -12192,9 +12196,9 @@ export async function runAgent<T = unknown>(
                * genuinely cannot be performed on a page belongs in that
                * binding's throw list.
                *
-               * The result does not go on the trace. See
-               * {@link AgentPrompt.toolResults}: a trace is durable and
-               * reaches a webhook, and this text is somebody's inbox.
+               * The result's text does not go on the trace, only its port's
+               * note. See {@link AgentPrompt.toolResults}: a trace is durable
+               * and reaches a webhook, and a connector's text is somebody's inbox.
                */
               case 'callTool': {
                 const result = await page.callTool(action.tool, action.arguments);
@@ -12253,11 +12257,20 @@ export async function runAgent<T = unknown>(
                * The new handle goes into the manifest at once, so the next
                * prompt names it whether or not that step's own re-read has
                * landed yet.
+               *
+               * With no file port the verb is not offered, and a model that
+               * writes it anyway is REFUSED, not failed: nothing was sent to
+               * the page, so it is not charged to `stepFailures` unless
+               * repeated (see {@link RefusedActionError}). As a plain throw it
+               * was the fourth failure in a row after three clicks that
+               * changed nothing and ended the run (dev it-15, 2026-10-14).
                */
               case 'createFile': {
                 if (runFiles?.create === undefined) {
-                  throw new Error(
-                    'createFile: this run cannot create files. A file is handed to a run with POST /v1/agent/{id}/files.',
+                  throw new RefusedActionError(
+                    'createFile: this run cannot create files, so none was made. Go on without one, or finish saying ' +
+                      'the task needs a file. A file is handed to a run with POST /v1/agent/{id}/files.',
+                    'createFile',
                   );
                 }
                 const made = await runFiles.create({ name: action.file, text: action.text });

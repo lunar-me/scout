@@ -40,6 +40,7 @@ export {
   NoModelError,
   OffScreenTargetError,
   PointerAimRefusedError,
+  TextTargetError,
   UnmeasurableTargetError,
   UnperformableActionError,
   type CoverAccount,

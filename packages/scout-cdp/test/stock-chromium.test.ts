@@ -157,6 +157,138 @@ describe.skipIf(chromiumPath === undefined)('stockFlavor on a stock headless Chr
     expect(await evaluate(page, 'document.querySelector("[name=t]").value')).toBe('19:30');
   }, 60_000);
 
+  describe('a form whose fields are editable regions', () => {
+    // A plain contenteditable field labelled with `for`, a custom dropdown
+    // whose caption is text in a non-editable region, and a rich-text editor
+    // built the way Quill builds one: a `contenteditable` root holding
+    // paragraphs, its placeholder drawn by `::before` while it is blank, and
+    // its value copied out by a MutationObserver.
+    const EDITABLE_FORM = `<!doctype html><html><head><title>Sign up</title><style>
+.field { border: 1px solid #888; min-height: 24px; padding: 4px; width: 300px }
+.field[data-placeholder]:empty::before { content: attr(data-placeholder); color: #999 }
+.ql-editor { min-height: 60px; border: 1px solid #888; width: 300px }
+.ql-editor.ql-blank::before { content: attr(data-placeholder); color: #999; position: absolute }
+</style></head><body>
+<form>
+<label for="email">Email</label><div class="field" id="email" contenteditable="true" data-placeholder="you@example.com"></div>
+<label for="country">Country</label><div class="field" id="country" contenteditable="false" style="cursor: pointer">Select country...</div>
+<label>Bio</label><div class="ql-container"><div class="ql-editor ql-blank" contenteditable="true" data-placeholder="Write something..."><p><br></p></div></div>
+<label>Notes</label><div class="ql-container"><div class="ql-editor" contenteditable="true" aria-label="Notes"><p>Draft</p></div></div>
+<input type="hidden" name="email"><input type="hidden" name="bio">
+</form>
+<script>
+var email = document.getElementById('email');
+email.addEventListener('input', function () { document.querySelector('[name=email]').value = email.textContent.trim(); });
+var bio = document.querySelector('.ql-editor');
+new MutationObserver(function () {
+  bio.classList.toggle('ql-blank', bio.innerText.trim() === '');
+  document.querySelector('[name=bio]').value = bio.innerText.trim();
+}).observe(bio, { subtree: true, childList: true, characterData: true });
+</script></body></html>`;
+
+    test('each editable region is shown as a field and filled through it, and the check reads it back', async () => {
+      const page = await chrome.open(`data:text/html,${encodeURIComponent(EDITABLE_FORM)}`);
+      const deps = bind(page);
+      const tree = await deps.snapshot();
+      const email = nodeNamed(tree, 'textbox', 'Email');
+      const bio = nodeNamed(tree, 'textbox', 'Write something...');
+      expect(nodeNamed(tree, 'textbox', 'Notes').value).toBe('Draft');
+      // The dropdown's caption is not a field.
+      expect(walk(tree).filter((node) => node.role === 'textbox')).toHaveLength(3);
+
+      const result = await runAgent(
+        {
+          ...deps,
+          model: (prompt): ModelChoice => ({
+            action:
+              prompt.step === 0
+                ? { type: 'fill', ref: email.ref, text: 'ada@example.com' }
+                : prompt.step === 1
+                  ? { type: 'fill', ref: bio.ref, text: 'Hello there' }
+                  : { type: 'done', summary: 'filled' },
+          }),
+        },
+        { task: 'fill the form', caps: { steps: 4, budget: '1.00', duration: '1m' }, stepFailures: 3, verify: true },
+      );
+
+      expect(await evaluate(page, 'document.querySelector("[name=email]").value')).toBe('ada@example.com');
+      expect(await evaluate(page, 'document.querySelector("[name=bio]").value')).toBe('Hello there');
+      expect(await evaluate(page, 'document.querySelector(".ql-editor").classList.contains("ql-blank")')).toBe(false);
+      expect(result.steps[0]?.check?.verdict).toBe('confirmed');
+      expect(result.steps[1]?.check?.verdict).toBe('confirmed');
+      const after = await deps.snapshot();
+      expect(nodeNamed(after, 'textbox', 'Email').value).toBe('ada@example.com');
+      expect(nodeNamed(after, 'textbox', 'Write something...').value).toBe('Hello there');
+    }, 60_000);
+
+    test('a fill on text inside an editor types into the editor, and one on text no field holds is refused', async () => {
+      const page = await chrome.open(`data:text/html,${encodeURIComponent(EDITABLE_FORM)}`);
+      const deps = bind(page);
+      const tree = await deps.snapshot();
+
+      await deps.perform({ type: 'fill', ref: nodeNamed(tree, 'StaticText', 'Draft').ref, text: 'Final copy' });
+      expect(await evaluate(page, 'document.querySelectorAll(".ql-editor")[1].innerText.trim()')).toBe('Final copy');
+
+      const caption = nodeNamed(tree, 'StaticText', 'Select country...');
+      await expect(deps.perform({ type: 'fill', ref: caption.ref, text: 'ada@example.com' })).rejects.toThrow('text-target');
+      expect(await evaluate(page, 'document.getElementById("country").textContent')).toBe('Select country...');
+      expect(await evaluate(page, 'document.getElementById("email").textContent')).toBe('');
+    }, 60_000);
+  });
+
+  test('a click on an option whose text sits in a plain span chooses it, and the same text under a cover is refused', async () => {
+    const page = await chrome.open(
+      `data:text/html,${encodeURIComponent(
+        '<!doctype html><title>Gender</title><style>.opt { display: flex; cursor: pointer; width: 200px } .dot { width: 18px; height: 18px }</style>' +
+          '<div class="opt" data-value="male"><span class="dot"></span><span>Male</span></div>' +
+          '<div class="opt" data-value="female"><span class="dot"></span><span>Female</span></div>' +
+          '<div style="position: relative"><div class="opt" data-value="other"><span class="dot"></span><span>Other</span></div>' +
+          '<div style="position: absolute; inset: 0; background: white">over</div></div>' +
+          '<p id="chosen">none</p><script>document.querySelectorAll(".opt").forEach(function (o) { o.addEventListener("click", function () {' +
+          ' document.getElementById("chosen").textContent = o.dataset.value; }); });</script>',
+      )}`,
+    );
+    const deps = bind(page);
+    const tree = await deps.snapshot();
+
+    await deps.perform({ type: 'click', ref: nodeNamed(tree, 'StaticText', 'Female').ref });
+    expect(await evaluate(page, 'document.getElementById("chosen").textContent')).toBe('female');
+
+    await expect(deps.perform({ type: 'click', ref: nodeNamed(tree, 'StaticText', 'Other').ref })).rejects.toThrow('covered-target');
+    expect(await evaluate(page, 'document.getElementById("chosen").textContent')).toBe('female');
+  }, 60_000);
+
+  test('a success line drawn transparent is not read until the page shows it', async () => {
+    const page = await chrome.open(
+      `data:text/html,${encodeURIComponent(
+        '<!doctype html><title>Keys</title><p>Press the button to finish.</p>' +
+          '<p id="ok" style="opacity: 0">Challenge completed successfully!</p>' +
+          '<button onclick="document.getElementById(\'ok\').style.opacity = 1">Finish</button>',
+      )}`,
+    );
+    // An extraction model that reports exactly what it is given.
+    const deps = bindAgent(page, {
+      model: {
+        choose: (): Promise<ModelChoice> => Promise.reject(new Error('not asked')),
+        extract: (input) =>
+          Promise.resolve({
+            data: { status: input.content.kind === 'tree' && serializeTree(input.content.tree).includes('completed successfully') ? 'success' : 'not yet' },
+          }),
+      },
+      tabs: null,
+      files: null,
+      hands,
+      flavor: stockFlavor,
+    });
+
+    expect((await deps.extract(undefined, 'the status shown')).data).toEqual({ status: 'not yet' });
+    expect(walk(await deps.snapshot()).some((node) => node.name === 'Challenge completed successfully!')).toBe(false);
+
+    await deps.perform({ type: 'click', ref: nodeNamed(await deps.snapshot(), 'button', 'Finish').ref });
+
+    expect((await deps.extract(undefined, 'the status shown')).data).toEqual({ status: 'success' });
+  }, 60_000);
+
   test('the prompt says how to fill a native date or time input whole, and says nothing of an ARIA one', async () => {
     // The ARIA clock's Minutes sits directly beside the date input's first
     // segment, so a run that joined them would hide the date input's line.

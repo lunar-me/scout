@@ -105,7 +105,7 @@ describe('a run whose host can write files may create one and attach it', () => 
     expect(result.steps[0]?.error).toContain('.txt');
   });
 
-  test('a run whose host cannot write fails the step by name, not the run', async () => {
+  test('a run whose host cannot write is refused the step by name, uncharged, and the run goes on', async () => {
     const h = harness({
       model: (_prompt, step) =>
         step === 0 ? { action: { type: 'createFile', file: 'cv.pdf', text: 'cv' } } : { action: done },
@@ -113,7 +113,8 @@ describe('a run whose host can write files may create one and attach it', () => 
       files: () => [],
     });
 
-    const result = await runAgent(h.deps, { task: 'apply', caps: CAPS, stepFailures: 1 });
+    // No failure tolerated: a charged failure would end the run on step 0 (dev it-15, 2026-10-14).
+    const result = await runAgent(h.deps, { task: 'apply', caps: CAPS, stepFailures: 0 });
 
     expect(result.status).toBe('completed');
     expect(result.steps[0]?.error).toContain('cannot create files');

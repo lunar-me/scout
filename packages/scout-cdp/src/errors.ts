@@ -460,6 +460,30 @@ export class FileInputClickError extends RefusedActionError {
   }
 }
 
+/**
+ * A `fill` on text that no field encloses: a label, a heading, a control's
+ * caption such as a custom dropdown's "Select country...". Nothing is typed.
+ * Text inside a field is typed into that field instead (`performFill`), so
+ * what reaches this is text a person could not type into either. It used to
+ * reach the model as the protocol's "DOM.focus failed: Node is not an
+ * Element" (dev it-17.r1, 2026-10-14, steps 2 and 13), which names neither
+ * what the node was nor what to do.
+ */
+export class TextTargetError extends RefusedActionError {
+  readonly ref: NodeRef;
+
+  constructor(action: string, ref: NodeRef) {
+    super(
+      `text-target: ${action} names node ${formatNodeRef(ref)}, which is text on the page and not inside any field, ` +
+        'so nothing was typed. Fill the field itself: a textbox, searchbox or combobox line in the page read. If the ' +
+        'text is the caption of a control that opens a list, click it and choose from the list.',
+      formatNodeRef(ref),
+    );
+    this.name = 'TextTargetError';
+    this.ref = ref;
+  }
+}
+
 /** Whether a `<select>` opens its options as a popup menu rather than a list box in the page. */
 export function opensPopupMenu(element: DescribedElement): boolean {
   if (element.tag !== 'select' || element.attribute('multiple') !== undefined) return false;
