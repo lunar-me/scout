@@ -51,12 +51,14 @@ import type { LoadRequest, LoadResult, ShotRegion, TabHooks } from './hooks';
 import type { BindingOptions } from './options';
 import { dialogReadMs } from './dialog';
 import { DRAG_OVER_INTERVAL_MS, DRAG_START_WAIT_MS, liftOf, type Html5DragArm } from './drag';
-import { NoModelError, CoveredTargetError, CrossFrameRefError, DISABLEABLE_TAGS, DisabledTargetError, FilesUnavailableError, HandsUnavailableError, NativeSelectPopupError, OffScreenTargetError, PointerAimRefusedError, UnmeasurableTargetError, UnperformableActionError, opensPopupMenu, overlayAccount, type CoverAccount, type Hit, type ShownNode } from './errors';
+import { NoModelError, CoveredTargetError, CrossFrameRefError, DISABLEABLE_TAGS, DisabledTargetError, FileInputClickError, FilesUnavailableError, HandsUnavailableError, NativeSelectPopupError, OffScreenTargetError, PointerAimRefusedError, UnmeasurableTargetError, UnperformableActionError, opensPopupMenu, overlayAccount, type CoverAccount, type Hit, type ShownNode } from './errors';
 import { DEFAULT_LOCK_TIMEOUT_MS, ERROR_PAGE_PREFIX, FREEZE_REPLY_DEADLINE_MS, FreezeNotAnsweredError, LOADING_HOLDS_BEFORE_TURN, NAVIGATION_FREEZE_HOLD_MS, StillLoadingError, UNANSWERED_RELEASE_WAIT_MS, heldFreezes, within } from './freeze';
 import type { HandsContext, HandsPort, HandsStep, HandsTarget, PointerSample } from './hands';
 import { selfReleases, sendUntilForwarded } from './input';
 import { asksForDestination, withLinkHrefs } from './link-hrefs';
 import { pdfDocuments, pdfMarkdown, pdfNotice } from './pdf-document';
+import { textDocumentMarkdown, textDocumentNotice, textDocumentWindow, textDocuments, type TextDocumentRead } from './text-document';
+import { topFrameWatch } from './top-frame';
 import { HIT_SAMPLES, HIT_WINDOW_PX, LANDING_DRAWS, LIST_OPTION_POLL_MS, LIST_OPTION_ROLES, LIST_OPTION_WAIT_MS, LIST_SELECT_SETTLE_MS, MAX_REACH_GESTURE_PX, MAX_REACH_TOTAL_PX, MAX_SCROLLS_TO_REACH, MIN_HITTABLE_PX, PAINTED_DESCENDANT_DEPTH, PAINTED_DESCENDANT_READS, PAINTED_RUN_STEPS, POINT_AIM_PX, REST_EPSILON_PX, SCROLL_PROGRESS_PX, SCROLL_REST_POLL_MS, SCROLL_REST_TIMEOUT_MS, TYPED_LIST_ROLES, normalisedName, textOutsideLists } from './reach';
 import { CLIPPING_SCROLLER, DISMISS_NAME, FILE_INPUT_NEAR, FIXED_OF, FOCUS_TAKES_TEXT, LABELLED_CONTROL_TYPES, MAX_DISMISS_CHECKS, MAX_DISMISS_NAMED, MAX_MIXED_LABEL_READS, MAX_NATIVE_DATE_READS, MODAL_OF, NATIVE_DATE_HOST, NATIVE_DATE_LAYOUT, SAME_CONTROL, SELECT_OF, asShown, clipFrom, nativeSelect, refusedSubmit } from './scripts';
 
@@ -303,8 +305,12 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
     }
   });
 
+  /** What this tab's top frame shows, for the two readers below. */
+  const topFrame = topFrameWatch(page);
   /** The PDF this tab is showing, when it shows one: see `./pdf-document.ts`. */
-  const pdf = pdfDocuments(page);
+  const pdf = pdfDocuments(page, topFrame);
+  /** The large plain-text file this tab is showing, when it shows one: see `./text-document.ts`. */
+  const textFile = textDocuments(page, topFrame);
 
   /**
    * THE NAVIGATION THIS TAB WAS LEFT TO LOAD, and how many freeze holds have
@@ -1156,6 +1162,16 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
   async function observe(conceal: boolean): Promise<AxTree> {
     // Never a tree of what our exit wrote: see {@link scrubbed}.
     await scrubbed;
+    // A large plain-text file is never handed to the tree, whose build on it
+    // holds the renderer for minutes: see `./text-document.ts`.
+    const large = await textFile.large();
+    if (large !== undefined) {
+      tabFrames = undefined;
+      forgetFrameOwners();
+      const shown = await textDocumentTree(large);
+      const mask = conceal ? tab?.masking?.tree : undefined;
+      return mask === undefined ? shown : await mask(shown);
+    }
     // `maxNodes: SNAPSHOT_MAX_NODES` and not the fork's own default — see
     // that constant's own comment for the measurement and the reasoning.
     const reply = await flavor.axTree(page, { maxNodes: SNAPSHOT_MAX_NODES });
@@ -1170,6 +1186,32 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
     const noted = await withPdfNotice(shown);
     const mask = tab?.masking?.tree;
     return mask === undefined ? noted : await mask(noted);
+  }
+
+  /**
+   * The tree of a large text document: its root, the line saying what it is,
+   * and its opening window. Both lines carry the root's ref: they are text,
+   * not controls. The root is the document node, by the same number the tree
+   * would have given it (Blink's accessibility id is the DOM node id).
+   */
+  async function textDocumentTree(read: TextDocumentRead): Promise<AxTree> {
+    const documentNode = (await page.send('DOM.getDocument', { depth: 0 }))['root'];
+    const backendNodeId = isRecord(documentNode) ? documentNode['backendNodeId'] : undefined;
+    if (typeof backendNodeId !== 'number') throw new TypeError('DOM.getDocument returned no backendNodeId for the document');
+    const ref = nodeRef(await sessionFrame(), backendNodeId);
+    return {
+      url: read.url,
+      root: {
+        ref,
+        role: 'RootWebArea',
+        name: read.url,
+        xpath: '',
+        children: [
+          { ref, role: 'StaticText', name: textDocumentNotice(read), xpath: '' },
+          { ref, role: 'StaticText', name: textDocumentWindow(read), xpath: '' },
+        ],
+      },
+    };
   }
 
   /**
@@ -2295,6 +2337,9 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
       }
       if (element !== undefined && opensPopupMenu(element)) {
         throw new NativeSelectPopupError('click', action.ref);
+      }
+      if (element?.tag === 'input' && element.attribute('type')?.toLowerCase() === 'file') {
+        throw new FileInputClickError('click', action.ref);
       }
     }
 
@@ -3877,9 +3922,14 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
       // cannot be read (no copy kept, encrypted, a scan) falls through to the
       // tree, whose first line says why.
       const document = await pdf.read();
+      // A large plain-text file is read from its own text too, never from a
+      // tree: see `./text-document.ts`.
+      const large = document === undefined ? await textFile.large() : undefined;
       let content: ExtractContent;
       if (document?.outcome === 'read') {
         content = { kind: 'markdown', markdown: concealed(pdfMarkdown(document)) };
+      } else if (large !== undefined) {
+        content = { kind: 'markdown', markdown: concealed(textDocumentMarkdown(large)) };
       } else {
         // Where links go, only when this extraction asks for a destination: see
         // `./link-hrefs.ts` for what that costs and why the page cannot see it

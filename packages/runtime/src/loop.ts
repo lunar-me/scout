@@ -3726,6 +3726,49 @@ export const DEFAULT_ASK_WAIT_MS = 30 * 60_000;
 export const MAX_ASK_WAIT_MS = 60 * 60_000;
 
 /**
+ * How long a question parks on a run nobody is known to be watching: two
+ * minutes, after which the model is told nobody answered and to go on.
+ *
+ * "Known to be watching" is {@link AgentRunRequest.answerable}: the question
+ * is pushed to the customer (`notify.level` step or debug), a person took
+ * control of this run, or an earlier question on it was answered. Otherwise
+ * nobody learns of the question except by polling the run.
+ *
+ * MEASURED, production read-only, 30 days to 2026-10-14: 98 questions asked
+ * (40 in the last 7 days). The 8 asked on customer runs (3 accounts, every one
+ * `notify.level` error with no webhook) got 0 answers; all 36 answers went to
+ * internal harness runs. Of 367 customer agent runs, 366 pushed no question
+ * and none took control. On BU Bench 2026-10-14 (3 runs) 11 misses each spent
+ * a full 30-minute park on an ask nobody could answer.
+ *
+ * Not zero: a customer who polls `agent.get` and answers within two minutes
+ * still unblocks the run, which is the documented answer path. Two minutes,
+ * not thirty, because that is what an absent person costs every such run.
+ */
+export const UNATTENDED_ASK_WAIT_MS = 2 * 60_000;
+
+/**
+ * What the model is told when its question got no answer, in place of the
+ * answer. It used to say "carry on without it, or close the goal as failed",
+ * and on BU Bench 2026-10-14 the 11 runs that heard it (n=11, 3 runs) all
+ * failed; the 6 that had asked for a file to upload failed where every passing
+ * run of the same task had made one with createFile and attached it. So it
+ * says what proceeding means: a value the task left open is the run's to
+ * choose, and a missing upload is a file the run can make.
+ */
+export function unansweredProceed(canCreateFiles: boolean): string {
+  return (
+    'Nobody will answer; do not ask again. Proceed on your own judgment: choose any value the task left open ' +
+    'yourself (plausible test data where the task allows it)' +
+    (canCreateFiles
+      ? '; for a file input the task gave no file for, make one with createFile (an empty .png or .pdf will do) ' +
+        'and attachFile it'
+      : '') +
+    '. Fail the goal only if it cannot be done without the answer.'
+  );
+}
+
+/**
  * How many verbatim steps survive compaction.
  *
  * Eight rather than more because the verbatim tail exists for ONE job — telling
@@ -8048,6 +8091,15 @@ export interface AgentRunRequest {
    */
   readonly askWaitMs?: number;
   /**
+   * Whether anybody is known to be able to answer a question on this run
+   * right now, asked at each question. `false` caps a question's park at
+   * {@link UNATTENDED_ASK_WAIT_MS}, and an unanswered one then tells the model
+   * to proceed on its own judgment. Absent means the channel's own wait
+   * applies, as before. Purchase approvals are not affected: they always park
+   * for the full wait.
+   */
+  readonly answerable?: () => boolean;
+  /**
    * This run's purchases: `purchase.begin` and `purchase.end`, keyed by the
    * loop's step index (the run is closed over by the binding).
    *
@@ -9819,9 +9871,13 @@ export async function runAgent<T = unknown>(
     asked: { readonly question: string; readonly options?: readonly string[]; readonly ask?: AgentQuestion },
     step: number,
   ): Promise<AskAnswer | undefined> => {
+    // A question nobody is known to be watching parks briefly: see
+    // UNATTENDED_ASK_WAIT_MS. An approval always takes the full wait.
+    const unattended = asked.ask === undefined && req.answerable?.() === false;
     const waitMs = Math.min(
       Math.max(req.askWaitMs ?? DEFAULT_ASK_WAIT_MS, 0),
       MAX_ASK_WAIT_MS,
+      unattended ? UNATTENDED_ASK_WAIT_MS : MAX_ASK_WAIT_MS,
       Math.max(0, Math.floor(ledger.budgetRemainingMs())),
     );
     const question: AskedQuestion = {
@@ -9868,11 +9924,7 @@ export async function runAgent<T = unknown>(
       reply.answer === undefined
         ? `Asked "${asked.question}" but no answer was received${
             channelFailed === undefined ? '' : ` (the channel failed: ${channelFailed})`
-          }. Nothing was decided. ${
-            asked.ask === undefined
-              ? 'Do not ask this again: carry on without it, or close the goal as failed.'
-              : 'The purchase was not approved.'
-          }`
+          }. Nothing was decided. ${asked.ask === undefined ? unansweredProceed(runFiles?.create !== undefined) : 'The purchase was not approved.'}`
         : `The person who submitted this task answered "${asked.question}": ${reply.answer}`;
     const finding: Finding = {
       step,

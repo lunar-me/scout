@@ -53,9 +53,10 @@
  * snapshot carries one line saying the tab shows a PDF and that `extract`
  * reads it, because a model shown only a toolbar concludes the page is empty.
  */
-import { extractPdfText, isRecord, type PdfRefusal } from '@outcrawl/scout-core';
+import { extractPdfText, type PdfRefusal } from '@outcrawl/scout-core';
 
 import type { CdpPage } from './cdp';
+import { cutAtLine, topResource, within, type TopFrame, type TopFrameWatch } from './top-frame';
 
 /**
  * The largest PDF read, in bytes. The bytes cross the CDP socket as base64
@@ -87,17 +88,6 @@ export const PDF_READ_DEADLINE_MS = 10_000;
 export const PDF_FRAME_READ_DEADLINE_MS = 1_000;
 
 const PDF_MIME_TYPE = 'application/pdf';
-
-/** `promise`'s value, or `undefined` once `ms` have passed. A real timer: see `./freeze.ts`. */
-async function within<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
-  const late = Promise.withResolvers<undefined>();
-  const timer = setTimeout(() => late.resolve(undefined), ms);
-  try {
-    return await Promise.race([promise, late.promise]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 /** What a read of the tab's PDF came to. */
 export type PdfDocumentRead =
@@ -133,35 +123,12 @@ export interface PdfDocuments {
   peek(): Promise<{ readonly url: string; readonly read: PdfDocumentRead | undefined } | undefined>;
 }
 
-interface TopFrame {
-  readonly id: string;
-  readonly url: string;
-  readonly mimeType: string;
-  readonly loaderId: string;
-}
-
-function topFrameOf(frame: unknown): TopFrame | undefined {
-  if (!isRecord(frame)) return undefined;
-  const { id, url, mimeType, loaderId } = frame;
-  return typeof id === 'string' && typeof url === 'string' && typeof mimeType === 'string' && typeof loaderId === 'string'
-    ? { id, url, mimeType, loaderId }
-    : undefined;
-}
-
 const REFUSALS: Readonly<Record<PdfRefusal, string>> = {
   encrypted: 'it is encrypted',
   'no-text-layer': 'it has no text layer: its pages are images, a scan',
   'not-a-pdf': 'the bytes the browser holds for it are not a PDF',
   unreadable: 'its structure could not be read',
 };
-
-/** `text` cut to `max` characters at a line, and how many were left out. */
-function cutAtLine(text: string, max: number): { readonly text: string; readonly omittedChars: number } {
-  if (text.length <= max) return { text, omittedChars: 0 };
-  const line = text.lastIndexOf('\n', max);
-  const at = line > 0 ? line : max;
-  return { text: text.slice(0, at), omittedChars: text.length - at };
-}
 
 /** A read that ended this way is final for its document; any other is tried again. */
 interface Settled {
@@ -181,71 +148,18 @@ interface Reading {
 }
 
 /** Reads the PDF `page`'s top frame is showing, once per document. */
-export function pdfDocuments(page: CdpPage, deadlineMs = PDF_READ_DEADLINE_MS): PdfDocuments {
-  // The top frame as the last main-frame commit described it: `undefined`
-  // until a commit is seen, `null` for a document that cannot be a PDF read
-  // (a commit that did not describe itself). A commit replaces it, so a
-  // navigation never leaves a stale PDF behind; that rests on the host having
-  // enabled the Page domain, which both hosts do on every tab they drive.
-  let top: TopFrame | null | undefined;
-  page.on('Page.frameNavigated', (params) => {
-    const frame = params['frame'];
-    if (isRecord(frame) && frame['parentId'] === undefined) {
-      top = topFrameOf(frame) ?? null;
-    }
-  });
-
+export function pdfDocuments(page: CdpPage, watch: TopFrameWatch, deadlineMs = PDF_READ_DEADLINE_MS): PdfDocuments {
   let reading: Reading | undefined;
-  /** The one frame-tree read, while it runs. */
-  let topRead: Promise<void> | undefined;
-
-  /**
-   * The top frame. Read from the frame tree ONCE, only when this binding was
-   * made after the commit of the document it is showing (a tab the page
-   * opened, attached late); every later document arrives as a commit.
-   */
-  async function currentTop(waitMs: number): Promise<TopFrame | undefined> {
-    if (top === undefined) {
-      topRead ??= (async () => {
-        try {
-          const tree = (await page.send('Page.getFrameTree'))['frameTree'];
-          // A commit seen meanwhile is newer than this answer.
-          if (top === undefined) top = topFrameOf(isRecord(tree) ? tree['frame'] : undefined) ?? null;
-        } catch {
-          topRead = undefined;
-        }
-      })();
-      await within(topRead, waitMs);
-    }
-    return top ?? undefined;
-  }
 
   async function bytesOf(frame: TopFrame): Promise<{ readonly bytes: Uint8Array } | { readonly why: string }> {
-    const ask = (): Promise<Record<string, unknown>> => page.send('Page.getResourceContent', { frameId: frame.id, url: frame.url });
-    let reply: Record<string, unknown>;
-    try {
-      reply = await ask();
-    } catch (error) {
-      const said = error instanceof Error ? error.message : String(error);
-      if (!/not enabled/iu.test(said)) {
-        return { why: /not cached/iu.test(said) ? 'the browser kept no copy of it to read (it was served no-store, or is larger than the cache keeps)' : `the browser could not hand over its bytes (${said})` };
-      }
-      // `Page.getResourceContent` needs the Page domain. Only a host that did
-      // not enable it on this tab reaches this line.
-      await page.send('Page.enable').catch(() => undefined);
-      try {
-        reply = await ask();
-      } catch (again) {
-        return { why: `the browser could not hand over its bytes (${again instanceof Error ? again.message : String(again)})` };
-      }
-    }
-    const content = reply['content'];
-    if (typeof content !== 'string') return { why: 'the browser answered with no bytes' };
-    const size = reply['base64Encoded'] === true ? Math.floor((content.length * 3) / 4) : Buffer.byteLength(content, 'latin1');
+    const reply = await topResource(page, frame);
+    if ('why' in reply) return reply;
+    const { content, base64Encoded } = reply;
+    const size = base64Encoded ? Math.floor((content.length * 3) / 4) : Buffer.byteLength(content, 'latin1');
     if (size > PDF_MAX_BYTES) {
       return { why: `it is ${(size / 1_048_576).toFixed(1)} MB, over the ${String(PDF_MAX_BYTES / 1_048_576)} MB read here` };
     }
-    return { bytes: reply['base64Encoded'] === true ? Buffer.from(content, 'base64') : Buffer.from(content, 'latin1') };
+    return { bytes: base64Encoded ? Buffer.from(content, 'base64') : Buffer.from(content, 'latin1') };
   }
 
   async function readOnce(frame: TopFrame): Promise<Settled> {
@@ -293,7 +207,7 @@ export function pdfDocuments(page: CdpPage, deadlineMs = PDF_READ_DEADLINE_MS): 
   }
 
   async function pdfTop(waitMs: number): Promise<TopFrame | undefined> {
-    const frame = await currentTop(waitMs);
+    const frame = await watch.current(waitMs);
     return frame !== undefined && frame.mimeType === PDF_MIME_TYPE ? frame : undefined;
   }
 

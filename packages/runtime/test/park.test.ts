@@ -17,7 +17,7 @@ import { describe, expect, test } from 'bun:test';
 import { browserTimeCredits } from '@outcrawl/scout-core';
 
 import type { Action } from '../src/actions';
-import { MAX_ASK_WAIT_MS, PageSession, runAgent } from '../src/loop';
+import { DEFAULT_ASK_WAIT_MS, MAX_ASK_WAIT_MS, PageSession, UNATTENDED_ASK_WAIT_MS, runAgent } from '../src/loop';
 import type { AskAnswer, AskedQuestion, DurableRecord } from '../src/result';
 import { VirtualClock, catalogueTree, harness, refOf, testPricing } from './support';
 
@@ -171,6 +171,38 @@ describe('ask parks the run and an answer resumes it', () => {
     // run that was told nobody replied.
     expect(result.status).toBe('completed');
     expect(result.stopReason).toBe('task-complete');
+  });
+
+  test('a question nobody is known to watch parks two minutes, and the model is told to proceed', async () => {
+    const waits: number[] = [];
+    let watched = false;
+    const h = harness({
+      model: (_prompt, step) => ({ action: step < 2 ? { type: 'ask', question: `Which size? (${String(step)})` } : done }),
+      perform: () => undefined,
+      tree: page,
+    });
+
+    const result = await runAgent(h.deps, {
+      pricing: testPricing(),
+      task: 'buy a shirt',
+      // Enough budget that the budget is not what bounds either wait.
+      caps: { ...CAPS, budget: '100.00' },
+      stepFailures: 0,
+      answerable: () => watched,
+      onAsk: async (question) => {
+        waits.push(question.waitMs);
+        // The first goes unanswered; somebody shows up for the second.
+        watched = true;
+        return { answer: undefined };
+      },
+    });
+
+    expect(waits).toEqual([UNATTENDED_ASK_WAIT_MS, DEFAULT_ASK_WAIT_MS]);
+    expect(result.status).toBe('completed');
+    const told = result.findings[0]?.text ?? '';
+    expect(told).toContain('Nobody will answer; do not ask again. Proceed on your own judgment');
+    // This run cannot create files, so it is not told to.
+    expect(told).not.toContain('createFile');
   });
 
   test('a channel that throws is unanswered WITH THE REASON, not a dead run', async () => {

@@ -59,7 +59,11 @@ satisfying it is a complete test bed. Without this package `POST /v1/agent` and
     their own reply time, and pushes the answer, or the fact that none came, into `findings`,
     which are exempt from compaction. Bounded rather than open-ended:
     `AgentRunRequest.askWaitMs`, defaulted by `DEFAULT_ASK_WAIT_MS` (30 minutes),
-    ceilinged by `MAX_ASK_WAIT_MS` (one hour) and the remaining browser-time budget.
+    ceilinged by `MAX_ASK_WAIT_MS` (one hour) and the remaining browser-time budget. A question on a
+    run nobody is known to watch (`AgentRunRequest.answerable` false: no `notify.level` step/debug,
+    no take-control, no earlier answer) parks at most `UNATTENDED_ASK_WAIT_MS` (two minutes);
+    purchase approvals always get the full wait. An unanswered question tells the model to proceed
+    on its own judgment (`unansweredProceed`), naming createFile + attachFile when the run can create files.
     The answer finding is acknowledged before the loop acts again. An absent or
     failed channel is named explicitly, never reported as a fictitious elapsed wait.
     Its second form, `{"type":"ask","value":"card"}` (or `"details"`, validated to

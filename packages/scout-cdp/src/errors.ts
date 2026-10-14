@@ -434,6 +434,32 @@ export class NativeSelectPopupError extends RefusedActionError {
   }
 }
 
+/**
+ * A press on an `<input type=file>`. Nothing is dispatched: the press opens
+ * the operating system's file picker, which no action can fill, and the page
+ * then reads exactly as before. A file goes into the input with `attachFile`.
+ *
+ * BU Bench final runs, 2026-10-14 (n=6 failing runs, 22A 42B 57A 82B 92A 97A):
+ * each clicked its form's file input, read "nothing on the page changed" (or
+ * a covered-target refusal on it), asked the absent submitter for a file, and
+ * failed; every passing run of the same six tasks used createFile and
+ * attachFile instead. This refusal names that route at the click.
+ */
+export class FileInputClickError extends RefusedActionError {
+  readonly ref: NodeRef;
+
+  constructor(action: string, ref: NodeRef) {
+    super(
+      `file-input: ${action} names node ${formatNodeRef(ref)}, a file input. A click opens the system file picker, ` +
+        'which no action can fill, so nothing was dispatched. Put a file in it with attachFile and this ref. If the ' +
+        'task gives no file and createFile is offered, make one first (an empty .png or .pdf is a valid upload) and attach that.',
+      formatNodeRef(ref),
+    );
+    this.name = 'FileInputClickError';
+    this.ref = ref;
+  }
+}
+
 /** Whether a `<select>` opens its options as a popup menu rather than a list box in the page. */
 export function opensPopupMenu(element: DescribedElement): boolean {
   if (element.tag !== 'select' || element.attribute('multiple') !== undefined) return false;

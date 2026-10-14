@@ -33,6 +33,7 @@ export {
   CoveredTargetError,
   CrossFrameRefError,
   DisabledTargetError,
+  FileInputClickError,
   FilesUnavailableError,
   HandsUnavailableError,
   NativeSelectPopupError,
