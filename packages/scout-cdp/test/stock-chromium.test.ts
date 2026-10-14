@@ -367,4 +367,122 @@ form.addEventListener('submit', function (event) {
       );
     }, 60_000);
   });
+
+  describe('a chart that shows a value only in the tooltip under the pointer', () => {
+    // Two charts with no element per data point, the way charting libraries
+    // draw them: a line drawn as ONE svg path under a transparent overlay,
+    // whose tooltip is redrawn on the next animation frame after a move, and
+    // a bar chart painted on a canvas, whose tooltip waits out a debounce.
+    // Each logs every pointer event it receives, so a test can tell a hover
+    // from a press.
+    const RAIN = [52, 41, 37, 66, 23, 71, 18, 45, 59, 30, 84, 12];
+    const SALES = [310, 145, 275, 520, 90];
+    const LEFT = 50;
+    const STEP = 45;
+    const CHARTS = `<!doctype html><html><head><title>Charts</title><style>
+body { margin: 0; font: 14px sans-serif }
+.tip { position: absolute; display: none; background: #fff; border: 1px solid #888; padding: 2px 6px; pointer-events: none }
+</style></head><body>
+<h1 style="margin:0;height:40px">Rainfall</h1>
+<svg id="line" width="600" height="200" style="display:block"><path id="path" fill="none" stroke="steelblue" stroke-width="2"></path><rect id="over" x="0" y="0" width="600" height="200" fill="transparent"></rect></svg>
+<div id="lineTip" class="tip" role="tooltip"></div>
+<h2 style="margin:0;height:40px">Sales</h2>
+<canvas id="bars" width="300" height="160" style="display:block"></canvas>
+<div id="barTip" class="tip" role="tooltip"></div>
+<script>
+var rain = ${JSON.stringify(RAIN)}, sales = ${JSON.stringify(SALES)};
+var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+window.events = [];
+['pointermove','pointerdown','pointerup','mousedown','mouseup','click'].forEach(function (kind) {
+  document.addEventListener(kind, function (event) { events.push(kind + (event.isTrusted ? '' : ':untrusted')); }, true);
+});
+document.getElementById('path').setAttribute('d', rain.map(function (v, i) { return (i ? 'L' : 'M') + (${LEFT} + i * ${STEP}) + ' ' + (190 - v * 2); }).join(' '));
+var over = document.getElementById('over'), lineTip = document.getElementById('lineTip'), frame = 0;
+over.addEventListener('mousemove', function (event) {
+  var box = over.getBoundingClientRect(), x = event.clientX - box.left;
+  cancelAnimationFrame(frame);
+  frame = requestAnimationFrame(function () {
+    var i = Math.max(0, Math.min(rain.length - 1, Math.round((x - ${LEFT}) / ${STEP})));
+    lineTip.textContent = months[i] + ': ' + rain[i] + ' mm';
+    lineTip.style.left = (box.left + x + 12) + 'px';
+    lineTip.style.top = (box.top + 10) + 'px';
+    lineTip.style.display = 'block';
+  });
+});
+over.addEventListener('mouseleave', function () { cancelAnimationFrame(frame); lineTip.style.display = 'none'; });
+var bars = document.getElementById('bars'), barTip = document.getElementById('barTip'), paint = bars.getContext('2d'), wait = 0;
+sales.forEach(function (v, i) { paint.fillStyle = '#4a7'; paint.fillRect(10 + i * 60, 160 - v / 4, 40, v / 4); });
+bars.addEventListener('mousemove', function (event) {
+  var box = bars.getBoundingClientRect(), x = event.clientX - box.left;
+  clearTimeout(wait);
+  wait = setTimeout(function () {
+    var i = Math.floor((x - 5) / 60);
+    if (i < 0 || i >= sales.length) { barTip.style.display = 'none'; return; }
+    barTip.textContent = 'Region ' + (i + 1) + ': ' + sales[i] + ' units';
+    barTip.style.left = (box.left + x + 12) + 'px';
+    barTip.style.top = (box.top + 10) + 'px';
+    barTip.style.display = 'block';
+  }, 150);
+});
+bars.addEventListener('mouseleave', function () { clearTimeout(wait); barTip.style.display = 'none'; });
+</script></body></html>`;
+    /** Where month `i` is drawn on the line chart, in the viewport. */
+    const month = (i: number): { x: number; y: number } => ({ x: LEFT + i * STEP, y: 40 + 100 });
+    /** The middle of region `i`'s bar on the canvas, in the viewport. */
+    const region = (i: number): { x: number; y: number } => ({ x: 30 + i * 60, y: 40 + 200 + 40 + 150 });
+    const tooltips = (tree: AxTree): string[] => [
+      ...new Set(walk(tree).flatMap((node) => (/^(\w{3}: \d+ mm|Region \d: \d+ units)$/.test(node.name ?? '') ? [node.name ?? ''] : []))),
+    ];
+    /** The tooltips the tree shows once the page has run the frame the move scheduled. */
+    async function shownAfter(page: CdpPage, deps: AgentDeps): Promise<string[]> {
+      // The line chart draws its tooltip on the next animation frame: wait on
+      // that frame itself rather than on a guessed duration.
+      await page.send('Runtime.evaluate', {
+        expression: 'new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))',
+        awaitPromise: true,
+      });
+      return tooltips(await deps.snapshot());
+    }
+
+    test('a hover at a point shows the value under it, and presses nothing', async () => {
+      const page = await chrome.open(`data:text/html,${encodeURIComponent(CHARTS)}`);
+      const deps = bind(page);
+      expect(tooltips(await deps.snapshot())).toEqual([]);
+
+      await deps.perform({ type: 'hover', at: month(2) });
+      expect(await shownAfter(page, deps)).toEqual(['Mar: 37 mm']);
+      await deps.perform({ type: 'hover', at: month(10) });
+      expect(await shownAfter(page, deps)).toEqual(['Nov: 84 mm']);
+
+      const events = (await evaluate(page, 'JSON.stringify(events)')) as string;
+      expect(JSON.parse(events)).toContain('pointermove');
+      expect(JSON.parse(events).filter((kind: string) => kind !== 'pointermove')).toEqual([]);
+    }, 60_000);
+
+    test('through the loop, the step after a hover is shown the tooltip, a debounced one included', async () => {
+      const page = await chrome.open(`data:text/html,${encodeURIComponent(CHARTS)}`);
+      const deps = bind(page);
+      const seen: string[][] = [];
+      const plan: readonly ModelChoice['action'][] = [
+        { type: 'hover', at: month(5) },
+        { type: 'hover', at: region(3) },
+        { type: 'hover', at: month(0) },
+      ];
+      const result = await runAgent(
+        {
+          ...deps,
+          model: (prompt): ModelChoice => {
+            seen.push(tooltips(prompt.tree));
+            return { action: plan[prompt.step] ?? { type: 'done', summary: 'read' } };
+          },
+        },
+        { task: 'Read the June rainfall, region 4 sales and January rainfall.', caps: { steps: 6, budget: '1.00', duration: '1m' }, stepFailures: 0 },
+      );
+
+      expect(result.steps.map((step) => step.error)).toEqual(result.steps.map(() => undefined));
+      // A tooltip leaves when the pointer leaves its chart, so each step
+      // shows the one value under the pointer now.
+      expect(seen).toEqual([[], ['Jun: 71 mm'], ['Region 4: 520 units'], ['Jan: 52 mm']]);
+    }, 60_000);
+  });
 });

@@ -114,10 +114,25 @@ export function isReloadKey(key: string): boolean {
   return /^((Shift\+)?F5|(Control|Ctrl|Meta|Cmd|Command)\+(Shift\+)?[rR])$/.test(key.trim());
 }
 
-export interface HoverAction {
-  readonly type: 'hover';
-  readonly ref: NodeRef;
-}
+/**
+ * The pointer brought to rest over a node, or over a POINT of the viewport,
+ * with no press.
+ *
+ * `at` for the same reason {@link ClickAction} has it, and for one case a
+ * click cannot serve: a chart that shows a value only in the tooltip under the
+ * pointer. A line or bar chart drawn as one `<svg>` path or one `<canvas>` has
+ * no element per data point, so a ref can only aim the whole plot, and a click
+ * at the point presses a chart that may answer a press by selecting, zooming,
+ * pinning or navigating. Measured on production 2026-10-14 (`run_ad7ab3fa`,
+ * a public life-expectancy line chart, n=1): with hover taking a ref only,
+ * the run clicked at chart points four times to make the tooltip appear.
+ *
+ * Exactly one of the two, in the same space and under the same refusals as
+ * a click's point.
+ */
+export type HoverAction =
+  | { readonly type: 'hover'; readonly ref: NodeRef; readonly at?: undefined }
+  | { readonly type: 'hover'; readonly at: ViewportPoint; readonly ref?: undefined };
 
 /** Scrolls a container, or the page when no node is named. */
 export interface ScrollAction {
@@ -1079,28 +1094,22 @@ export function validateAction(action: unknown, tree: AxTree): ValidationResult<
   const index = indexTree(tree);
 
   switch (type) {
-    case 'click': {
+    case 'click':
+    case 'hover': {
       // `at` OR `ref`, never both: a model that sent both has not said which
-      // one it meant, and guessing is how a click lands on the wrong thing.
+      // one it meant, and guessing is how the pointer lands on the wrong thing.
       if (action['at'] !== undefined) {
         if (action['ref'] !== undefined) {
-          return { ok: false, errors: ['click takes ref OR at, not both'] };
+          return { ok: false, errors: [`${type} takes ref OR at, not both`] };
         }
         const at = resolvePoint(action['at'], 'at', errors);
-        return at === undefined ? { ok: false, errors } : { ok: true, value: { type: 'click', at } };
+        return at === undefined ? { ok: false, errors } : { ok: true, value: { type, at } };
       }
       const ref = resolveRef(action['ref'], index, errors);
       if (ref === undefined) {
         return { ok: false, errors };
       }
-      return { ok: true, value: { type: 'click', ref } };
-    }
-    case 'hover': {
-      const ref = resolveRef(action['ref'], index, errors);
-      if (ref === undefined) {
-        return { ok: false, errors };
-      }
-      return { ok: true, value: { type: 'hover', ref } };
+      return { ok: true, value: { type, ref } };
     }
     case 'drag': {
       const from = resolveEnd(action['from'], 'from', index, errors);
@@ -1468,7 +1477,7 @@ export function describeAction(action: Action, node?: AxNode): string {
     case 'press':
       return action.ref === undefined ? `press ${action.key}` : `press ${action.key} on ${nodeLabel(node)}`;
     case 'hover':
-      return `hover ${nodeLabel(node)}`;
+      return action.at === undefined ? `hover ${nodeLabel(node)}` : `hover at ${aimLabel(action.at)}`;
     case 'scroll': {
       const by = `${String(action.dx ?? 0)},${String(action.dy ?? 0)}`;
       return action.ref === undefined ? `scroll the page by ${by}` : `scroll ${nodeLabel(node)} by ${by}`;

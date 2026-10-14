@@ -241,9 +241,9 @@ const ACTION_SCHEMA = {
     amount: { type: 'string' },
     currency: { type: 'string' },
     /**
-     * `click`'s viewport point and `drag`'s two ends, declared for the
-     * standing rule above: without them both verbs are in the enum and
-     * ungrammatical. A drag end is a ref string OR a point, and that is the one
+     * `click`'s and `hover`'s viewport point and `drag`'s two ends, declared
+     * for the standing rule above: without them those verbs are in the enum
+     * and ungrammatical. A drag end is a ref string OR a point, and that is the one
      * union in this object — two `anyOf`s of two branches each, against the
      * provider's cap of 16. Declaring `from` and `to` as objects carrying an
      * optional `ref`, `x` and `y` instead would have avoided the union and

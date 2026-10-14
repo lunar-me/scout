@@ -2539,16 +2539,32 @@ interface BrainSlot {
 const EYES_MAX_TOKENS = 1_536;
 
 /**
- * The brain's reply ceiling. A decision is meant to be under 60 tokens and a
- * done answer with its evidence a few hundred; `json_object` does not stop a
- * runaway reply, which BrainMeasure measured at the old 4,096 ceiling
- * (2026-10-02 ~20:40Z, a frontier model as actor, 4,096 output tokens, $0.048).
- * A reply cut here is unusable and the step falls back to plain scout-1.
- * 1,000, not 600: reasoning tokens count against it and 'minimal' is not a
- * cap — BrainMeasure M1 (view C, 2026-10-02 21:54-21:58Z) spent 384 of 600 on
- * reasoning and was cut. A ceiling bills nothing it does not use.
+ * The brain's reply ceiling, its reasoning INCLUDED: `max_tokens` covers the
+ * reasoning the plan's effort asks for as well as the reply, and the two are
+ * cut together. A cut reply with no whole decision in it is unusable, and the
+ * step falls back to plain scout-1 with no strategy from the brain.
+ *
+ * 3,000, not 1,000. MEASURED, the fleet's per-call lines, 2026-10-07 to 10-14:
+ * 1,124 of 17,551 brain calls (6.4%) came back cut at 1,000 and unusable. On
+ * the research benchmark runs of 10-13 it was 596 of 3,444 (17.3%, 2.9 a run),
+ * and 403 of those had spent 300+ of the 1,000 on reasoning. It grows with
+ * the thread: 6% of calls under 5k context tokens, 19-27% past 10k, where a
+ * long research run spends its steps. Uncut (at 4,000), finished replies at
+ * the plan's effort ran p50 483 / p99 1,945 / max 2,192 tokens (n=142,
+ * 2026-10-14), 16% of them over 1,000; at 2,000 and 4,000 no reply was cut by
+ * its reasoning (0 of 226). 3,000 is the observed max plus a third.
+ *
+ * The ceiling still bounds a RUNAWAY: a reply that slips into tool-call markup
+ * and repeats it until cut (21 of 324 calls, 6.5%, the same day), which bills
+ * the whole ceiling at any height and no ceiling rescues. That is most of
+ * what the raise costs: on the 10-13 distribution at most +$0.025 a run
+ * (+15% of brain spend), $0.019 of it runaways running longer and $0.006 the
+ * replies that now finish. A ceiling bills nothing a finished reply does not
+ * use. (Before: 1,000, not 600, because reasoning counts against it,
+ * BrainMeasure M1 2026-10-02; the 4,096 runaway BrainMeasure measured that
+ * day is the runaway above.)
  */
-const BRAIN_MAX_TOKENS = 1_000;
+const BRAIN_MAX_TOKENS = 3_000;
 
 /** A task that asks the run to collect or record things as it goes. */
 const COLLECT_TASK = /\b(record|collect|note down|write down|keep track|list (each|every|all)|for each|each of the|every one)\b/i;

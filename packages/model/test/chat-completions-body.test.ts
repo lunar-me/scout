@@ -24,6 +24,11 @@
  * unchanged since 2026-10-08, live with the host's configuration tests and
  * still pass against this provider.
  *
+ * RE-PINNED 2026-10-14 (OC-370 point hover): the actor bodies' action grammar
+ * offers `{"type":"hover","at":{"x":N,"y":N}}` beside the ref form. That one
+ * line is the only difference (checked against non-brain-wire.golden.json);
+ * warm prompt caches cold-miss once on the deploy that carries it.
+ *
  * The bodies are produced through the real `ModelClient` where a real caller
  * goes through it (actor, extract, planner), and through the provider directly
  * for the vision shape, so the pin covers what the client actually
@@ -128,21 +133,21 @@ async function extractBody(
 
 describe('the body of every request shape is byte-identical to its pin', () => {
   test('actor, strict json_schema', async () => {
-    expect(digest(await actorBody('hands-model', false))).toBe('35d3ce183a28f19500747c76f65cbb010bbb329480ec4ce167933f412cf34447');
+    expect(digest(await actorBody('hands-model', false))).toBe('f77c5b589330996b61ca3477ea16ee8b73934fab17445c36462b813248ffcdcb');
   });
 
   test('actor, forced tool call', async () => {
-    expect(digest(await actorBody('planner-model', false))).toBe('6d8bc4e67487c1deedc138cd293191eb5f7b6fb627dfadc75162888ea19dca3c');
+    expect(digest(await actorBody('planner-model', false))).toBe('750874a6f5187d9df3d82a0a2be24943d2dd50bdb0b4cf2819a9929d8deb28e5');
   });
 
   test('actor, json_object with the schema in the system text, no reasoning field in the reply, and an excluded upstream', async () => {
-    expect(digest(await actorBody('brain-model', false, false))).toBe('27ffa17bc0ceb4eef442afb3e828c7a4237e7995d67e02a342148087298566f6');
+    expect(digest(await actorBody('brain-model', false, false))).toBe('a9cc6819b2f0e0fd68af12580bdd1121269cb2cae3d66dbb213a25d1f3de70bb');
   });
 
   test('actor with the vision arm: text then image parts', async () => {
     const body = await actorBody('hands-model', true);
     expect(body).toContain('"type":"image_url"');
-    expect(digest(body)).toBe('2fed02370b64838f0f5e0f1c88aca2878ab824e98d3938869d20ba7f5f6084be');
+    expect(digest(body)).toBe('c56ccbe9e0639f7bd758fa8092d9740514226023689fc08ffcfe2762f0edb1f9');
   });
 
   test('extract, strict, no instruction', async () => {

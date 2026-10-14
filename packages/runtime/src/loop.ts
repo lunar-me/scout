@@ -3281,7 +3281,7 @@ const ACTION_GRAMMAR = [
   '{"type":"fill","ref":"F-N","text":"..."}',
   '{"type":"select","ref":"F-N","value":"..."}',
   '{"type":"press","key":"Enter","ref":"F-N"}',
-  '{"type":"hover","ref":"F-N"}',
+  '{"type":"hover","ref":"F-N"} or {"type":"hover","at":{"x":N,"y":N}} (rest the pointer there, no press: a tooltip, a chart value under the pointer)',
   '{"type":"scroll","ref":"F-N","dy":600}',
   '{"type":"drag","from":"F-N" or {"x":N,"y":N},"to":"F-N" or {"x":N,"y":N}} (press, move with the button held, release)',
   '{"type":"navigate","url":"https://..."}',

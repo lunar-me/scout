@@ -383,7 +383,8 @@ export function lookToolPort(options: LookToolOptions): ToolPort {
       } else if (location === undefined) {
         lines.push(
           `It is at (${String(point.x)}, ${String(point.y)}) in the viewport. No element with a reference ` +
-            `is painted there; to press that point, use {"type":"click","at":${JSON.stringify(point)}}.`,
+            `is painted there; to press that point, use {"type":"click","at":${JSON.stringify(point)}}; to rest ` +
+            `the pointer on it without a press (a tooltip, a chart's value), use {"type":"hover","at":${JSON.stringify(point)}}.`,
         );
       } else {
         const wire = formatNodeRef(location.ref);
@@ -391,7 +392,8 @@ export function lookToolPort(options: LookToolOptions): ToolPort {
         lines.push(
           `It is at (${String(point.x)}, ${String(point.y)}) in the viewport, on [${wire}] ${location.role}${label}. ` +
             `To act on it, use ref "${wire}"; to press that exact point inside it (a canvas, a map), ` +
-            `use {"type":"click","at":${JSON.stringify(point)}}.`,
+            `use {"type":"click","at":${JSON.stringify(point)}}; to rest the pointer there without a press ` +
+            `(a tooltip, a chart's value), use {"type":"hover","at":${JSON.stringify(point)}}.`,
         );
       }
     }

@@ -2190,9 +2190,16 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
       }
       return;
     }
-    if (action.type === 'click' && action.at !== undefined) {
-      const aimed = await aimAtPoint('click', action.at);
-      await dispatchGesture(await hands.click(aimed.target, contextFor(aimed.view, page)), page);
+    // A POINT is aimed under the freeze in the top document's viewport and
+    // reached by the same approach a click's point takes; a hover is that
+    // approach and nothing else (see `HandsPort.hover`).
+    if ((action.type === 'click' || action.type === 'hover') && action.at !== undefined) {
+      const aimed = await aimAtPoint(action.type, action.at);
+      const context = contextFor(aimed.view, page);
+      await dispatchGesture(
+        action.type === 'click' ? await hands.click(aimed.target, context) : await hands.hover(aimed.target, context),
+        page,
+      );
       return;
     }
     // A DISABLED CONTROL IS REFUSED BEFORE ANY GESTURE: a press on it runs no
@@ -2662,7 +2669,7 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
    *     and a ref is dispatched on that frame's own session.
    */
   async function aimAtPoint(
-    action: 'click' | 'drag',
+    action: 'click' | 'hover' | 'drag',
     point: ViewportPoint,
   ): Promise<{ readonly target: HandsTarget; readonly view: { readonly width: number; readonly height: number } }> {
     const view = await viewport(page);

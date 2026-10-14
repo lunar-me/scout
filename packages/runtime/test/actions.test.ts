@@ -171,27 +171,27 @@ describe('validateAction is the trust boundary for model output', () => {
   });
 });
 
-describe('click at a point, and drag (IW6 canvas, IW7 drag-drop)', () => {
+describe('click and hover at a point, and drag (IW6 canvas, IW7 drag-drop, a chart tooltip)', () => {
   const wire = `${String(search.frameOrdinal)}-${String(search.backendNodeId)}`;
 
-  test('a click at a viewport point is accepted, names no node, and round-trips', () => {
-    const result = validateAction({ type: 'click', at: { x: 412.5, y: 230 } }, page);
-    expect(result.ok && result.value).toEqual({ type: 'click', at: { x: 412.5, y: 230 } });
+  test.each(['click', 'hover'] as const)('a %s at a viewport point is accepted, names no node, and round-trips', (type) => {
+    const result = validateAction({ type, at: { x: 412.5, y: 230 } }, page);
+    expect(result.ok && result.value).toEqual({ type, at: { x: 412.5, y: 230 } });
     if (!result.ok) return;
     // No node: the action cache cannot heal a point, and the loop must not
     // look one up.
     expect(hasRef(result.value)).toBe(false);
-    expect(describeAction(result.value)).toBe('click at (412.5, 230)');
+    expect(describeAction(result.value)).toBe(`${type} at (412.5, 230)`);
     // A loop-internal re-validation of the value it already holds is a no-op.
     expect(validateAction(result.value, page)).toEqual(result);
   });
 
-  test('a point with a negative or missing coordinate, or alongside a ref, is refused', () => {
-    expect(errorsFor({ type: 'click', at: { x: -1, y: 10 } })[0]).toContain('outside the viewport');
-    expect(errorsFor({ type: 'click', at: { x: 10 } })[0]).toMatch(/^at must be a viewport point/);
-    expect(errorsFor({ type: 'click', at: '10,20' })[0]).toMatch(/^at must be a viewport point/);
-    expect(errorsFor({ type: 'click', at: { x: Number.NaN, y: 1 } })[0]).toMatch(/^at must be a viewport point/);
-    expect(errorsFor({ type: 'click', ref: wire, at: { x: 1, y: 1 } })[0]).toBe('click takes ref OR at, not both');
+  test.each(['click', 'hover'] as const)('a %s point with a negative or missing coordinate, or alongside a ref, is refused', (type) => {
+    expect(errorsFor({ type, at: { x: -1, y: 10 } })[0]).toContain('outside the viewport');
+    expect(errorsFor({ type, at: { x: 10 } })[0]).toMatch(/^at must be a viewport point/);
+    expect(errorsFor({ type, at: '10,20' })[0]).toMatch(/^at must be a viewport point/);
+    expect(errorsFor({ type, at: { x: Number.NaN, y: 1 } })[0]).toMatch(/^at must be a viewport point/);
+    expect(errorsFor({ type, ref: wire, at: { x: 1, y: 1 } })[0]).toBe(`${type} takes ref OR at, not both`);
   });
 
   test('a drag takes a ref or a point at each end', () => {
