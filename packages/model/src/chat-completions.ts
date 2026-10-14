@@ -78,6 +78,7 @@ import {
 import {
   ModelCancelledError,
   ModelConfigError,
+  ModelError,
   ModelProviderError,
   ModelTimeoutError,
   ModelUnusableError,
@@ -277,7 +278,19 @@ export interface ChatCompletionsProviderOptions {
    * estimate. Absent, or a model not on it, bills `'0'` with the reason.
    */
   readonly rates?: RateCard;
-  /** Injected for tests. Defaults to the real transport. */
+  /**
+   * What a stated `usage.cost` is. `'provider'` (the default): the figure the
+   * endpoint billed the call at. `'subscription'`: a transport that answers
+   * on a flat-rate subscription and states the call's would-be list price, so
+   * the run's caps bind exactly as on a metered key while the ledger row says
+   * nothing was billed per call. See `CostSource`.
+   */
+  readonly statedCostSource?: 'provider' | 'subscription';
+  /**
+   * Injected for tests, or a transport that answers this same body elsewhere.
+   * Defaults to the real one. A transport may throw a `ModelError` of its
+   * own; it reaches the caller unchanged.
+   */
   readonly httpPost?: HttpPost;
   /** The generation lookup's transport. Injected for tests; defaults to the real one. */
   readonly httpGet?: HttpGet;
@@ -304,6 +317,7 @@ export class ChatCompletionsProvider implements ModelProvider {
   readonly #outputMode: (model: string) => StructuredOutputMode;
   readonly #routing: ProviderRouting | undefined;
   readonly #rates: RateCard;
+  readonly #statedCostSource: 'provider' | 'subscription';
 
   constructor(options: ChatCompletionsProviderOptions) {
     this.name = options.name;
@@ -318,6 +332,7 @@ export class ChatCompletionsProvider implements ModelProvider {
     this.#outputMode = options.outputMode ?? (() => 'strict');
     this.#routing = options.routing;
     this.#rates = options.rates ?? {};
+    this.#statedCostSource = options.statedCostSource ?? 'provider';
   }
 
   async complete(request: ModelRequest): Promise<ModelResponse> {
@@ -357,6 +372,9 @@ export class ChatCompletionsProvider implements ModelProvider {
         exactNumberKeys: [COST_KEY],
       });
     } catch (cause) {
+      if (cause instanceof ModelError) {
+        throw cause;
+      }
       if (cause instanceof HttpTransportError && cause.timedOut) {
         throw new ModelTimeoutError(request.timeoutMs, cause);
       }
@@ -436,7 +454,7 @@ export class ChatCompletionsProvider implements ModelProvider {
     const cost =
       statedUsd === undefined
         ? await this.#resolveCost(request.model, usage, requestId)
-        : { usd: statedUsd, source: 'provider' as const };
+        : { usd: statedUsd, source: this.#statedCostSource };
 
     const message = isRecord(choice['message']) ? choice['message'] : undefined;
 

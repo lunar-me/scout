@@ -665,7 +665,7 @@ export interface AgentModelCharge {
   readonly usd: string;
   /**
    * The provider USD the run's model calls actually cost. The provider's own figure per call,
-   * except the part named in {@link estimatedUsd}.
+   * except the parts named in {@link estimatedUsd} and {@link subscriptionUsd}.
    */
   readonly measuredUsd: string;
   /**
@@ -681,11 +681,17 @@ export interface AgentModelCharge {
   readonly byok: boolean;
   /**
    * How many of the run's model calls drew on a flat-rate subscription
-   * rather than a metered key, each at
-   * `'0'` USD and so contributing nothing to {@link usd}. Absent when none.
-   * Stamped on the `model_cost_usd` row as `metadata.subscriptionCalls`.
+   * rather than a metered key. Absent when none. Stamped on the
+   * `model_cost_usd` row as `metadata.subscriptionCalls`.
    */
   readonly subscriptionCalls?: number;
+  /**
+   * The part of {@link measuredUsd} that is subscription calls' WOULD-BE list price: nothing
+   * billed it per call, and it is counted so the run's caps bind as on a metered key. Absent
+   * when none. Stamped on the `model_cost_usd` row as `metadata.subscriptionUsd`, so a
+   * reconciliation against a provider subtracts it.
+   */
+  readonly subscriptionUsd?: string;
 }
 
 /**

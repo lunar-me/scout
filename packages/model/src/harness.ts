@@ -924,6 +924,14 @@ export interface HarnessPortOptions {
    * {@link provider}. `undefined` for a slug means {@link provider}.
    */
   readonly providerFor?: (slug: string) => ModelProvider | undefined;
+  /**
+   * The provider the BRAIN's thread goes to, when the host routes it away
+   * from {@link provider}: a lab run whose arm puts the brain on a flat-rate
+   * subscription passes that subscription's thread-capable provider here.
+   * Never {@link providerFor}, whose per-call providers refuse a thread.
+   * Absent: {@link provider}.
+   */
+  readonly brainProvider?: ModelProvider;
   readonly session: SessionAttribution;
   readonly ledger: CostLedger;
   /** One line per demotion, to the host's logger. Slugs; operator-only. */
@@ -1211,9 +1219,9 @@ export class HarnessModelPort implements ModelPort {
             ...(brain.providerOrder === undefined ? {} : { providerOrder: brain.providerOrder }),
             // Never the host's per-model provider (`providerFor`), whatever the
             // model: a flat-rate subscription provider refuses a multi-turn
-            // thread.
+            // thread. A host that routes the thread elsewhere says so.
             client: client(brain, {
-              provider: options.provider,
+              provider: options.brainProvider ?? options.provider,
               extractSystemPrompt: BRAIN_SYSTEM_PROMPT,
               maxExtractTokens: BRAIN_MAX_TOKENS,
               ...(brainReasoning === undefined ? {} : { extractReasoning: brainReasoning }),

@@ -327,9 +327,11 @@ export const ZERO_TOKENS: TokenUsage = {
  *   (`costOf(usage, ratesIn(rates, model))`). The one figure here that is ours
  *   and not the provider's, which is why it is named on every row it reaches.
  * - `subscription` — the call drew on one of our flat-rate subscriptions
- *   (subscription OAuth, lab arms only, OC-286), so it cost `'0'` per
- *   call. Named so a row at `'0'` is never mistaken for a call the provider
- *   forgot to price, and so no reconciliation attributes it to the gateway.
+ *   (subscription OAuth, lab arms only, OC-286), so nothing was billed per
+ *   call. The figure is `'0'`, or, where the provider states one, the call's
+ *   WOULD-BE list price (a lab brain on a subscription: its caps bind as on a
+ *   metered key). Named so neither is mistaken for a call the provider forgot
+ *   to price or billed, and so no reconciliation attributes it to the gateway.
  *
  * A missing cost never fails a call (W44 review, finding 3): the customer's
  * answer exists and was paid for, and accounting that cannot find its number

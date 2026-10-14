@@ -115,6 +115,7 @@ describe('attribution', () => {
       costUsd: '0',
       estimatedUsd: '0',
       subscriptionCalls: 0,
+      subscriptionUsd: '0',
     });
   });
 });

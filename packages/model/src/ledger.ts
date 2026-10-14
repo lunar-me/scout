@@ -127,11 +127,17 @@ export interface CostTotals {
   readonly estimatedUsd: string;
   /**
    * Calls a FLAT-RATE provider answered or refused (OC-286), included in
-   * {@link calls}: one named in `CostLedgerOptions.flatRateProviders`. Each is
-   * `'0'` USD: it drew on a flat-rate subscription, not on a metered key. `0`
-   * for every customer run.
+   * {@link calls}: one named in `CostLedgerOptions.flatRateProviders`. They
+   * drew on a flat-rate subscription, not on a metered key. `0` for every
+   * customer run.
    */
   readonly subscriptionCalls: number;
+  /**
+   * The part of {@link costUsd} recorded at `costSource: 'subscription'`: a
+   * WOULD-BE list price nothing billed per call, counted so the run's caps
+   * bind as on a metered key. `'0'` for every customer run.
+   */
+  readonly subscriptionUsd: string;
 }
 
 const NO_TOTALS: CostTotals = {
@@ -142,6 +148,7 @@ const NO_TOTALS: CostTotals = {
   costUsd: ZERO_CREDITS,
   estimatedUsd: ZERO_CREDITS,
   subscriptionCalls: 0,
+  subscriptionUsd: ZERO_CREDITS,
 };
 
 export interface CostLedgerOptions {
@@ -208,6 +215,8 @@ export class CostLedger {
       estimatedUsd:
         stored.costSource === 'estimate' ? addDecimal(from.estimatedUsd, stored.costUsd) : from.estimatedUsd,
       subscriptionCalls: from.subscriptionCalls + (subscription ? 1 : 0),
+      subscriptionUsd:
+        stored.costSource === 'subscription' ? addDecimal(from.subscriptionUsd, stored.costUsd) : from.subscriptionUsd,
     });
 
     this.#totals = advance(this.#totals);
@@ -252,7 +261,8 @@ export class CostLedger {
           `cached=${String(totals.usage.cacheReadTokens)} out=${String(totals.usage.outputTokens)} ` +
           `cost=$${totals.costUsd}` +
           (totals.estimatedUsd === ZERO_CREDITS ? '' : ` estimated=$${totals.estimatedUsd}`) +
-          (totals.subscriptionCalls === 0 ? '' : ` subscription=${String(totals.subscriptionCalls)}`),
+          (totals.subscriptionCalls === 0 ? '' : ` subscription=${String(totals.subscriptionCalls)}`) +
+          (totals.subscriptionUsd === ZERO_CREDITS ? '' : ` subscriptionUsd=$${totals.subscriptionUsd}`),
       );
     }
     return lines.join('\n');
