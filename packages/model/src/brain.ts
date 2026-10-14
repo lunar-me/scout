@@ -82,6 +82,7 @@ import {
   type Envelope,
   type NodeRef,
   type StepTrace,
+  type ToolCallEcho,
 } from '@outcrawl/runtime';
 
 import type { ModelTurn } from './provider';
@@ -118,7 +119,18 @@ import type { ModelTurn } from './provider';
  * - `elements`: the actionable elements, sent once.
  * - `step`: the compact state line kept in the thread for every step.
  * - `reads`: this step's reads, WHOLE (see {@link wholeRead}), outside `news`.
- * - `news`: findings, extracted data and tool results new this step — the
+ * - `tools`: the tool replies new this turn, WHOLE, in this call only and
+ *   outside `news` (see {@link toolReplies}). Inside `news` (1,200 shared with
+ *   findings and the plan) a 4,000-character `web.read` window reached the
+ *   brain as its first ~1,150 characters and a queued second reply as
+ *   nothing, while the reply's own note named an offset past text it never
+ *   saw (web-tools-on dev set, 2026-10-14: OM2W2 27/36 -> 18/36; 482 of 1,473
+ *   OM2W2 web calls shared a turn with an earlier one; 59% of web.read calls
+ *   re-read a URL already read). 13,000 holds three whole `web.read` replies
+ *   (a 4,000-character window plus its title, URL and note, about 4,200 each).
+ * - `toolKept`: what the replayed thread keeps of each tool reply after its
+ *   turn, and all a `web.search` reply shows: about what `news` gave one.
+ * - `news`: findings, extracted data and the plan new this step — the
  *   run's answer material, so bounded generously and cut with a marker that
  *   says the rest is on the run record.
  * - `wordsPerNote`: `why`/`note` are asked to stay within this; a reply is
@@ -131,6 +143,8 @@ export const BRAIN_BUDGET = Object.freeze({
   step: 600,
   news: 1_200,
   reads: 3_200,
+  tools: 13_000,
+  toolKept: 1_200,
   wordsPerNote: 12,
 });
 
@@ -3664,6 +3678,38 @@ export class BrainThread {
   #need: readonly string[] = [];
   /** The step the brain last decided on; -1 before its first decision. */
   #lastStep = -1;
+  /**
+   * Every tool reply the brain has not been shown yet, oldest first. The
+   * loop's prompt carries only the newest `TOOL_ECHO_WINDOW` (3), and a brain
+   * that queued more calls than that would otherwise never see the earlier
+   * replies; {@link observe} collects them from each step's prompt.
+   */
+  #tools: ToolCallEcho[] = [];
+  /** This turn's tool replies, whole, for the call {@link step} built them for only. See {@link once}. */
+  #once = '';
+
+  /**
+   * The tool replies of the turn {@link step} just built, whole: sent with
+   * that call outside the replayed thread (the harness's `tail`), which keeps
+   * their short form. Empty when no reply needed more than its short form.
+   */
+  once(): string {
+    return this.#once;
+  }
+
+  /**
+   * Holds this step's tool replies until the brain's next turn. Called on
+   * every step the harness handles, queued ones included; {@link step} calls
+   * it as well, so a caller that only steps loses nothing it was handed.
+   */
+  observe(prompt: AgentPrompt): void {
+    for (const echo of prompt.toolResults ?? []) {
+      if (echo.step > this.#seen.toolResults && !this.#tools.some((held) => held.step === echo.step)) {
+        this.#tools.push(echo);
+      }
+    }
+    this.#tools.sort((a, b) => a.step - b.step);
+  }
 
   /** The earlier turns, oldest first, for the provider. */
   turns(): readonly ModelTurn[] {
@@ -3706,9 +3752,11 @@ export class BrainThread {
       state.push(`Tabs: ${tabs.map((tab) => `${tab.id}${tab.active ? '*' : ''}`).join(' ')}`);
     }
     state.push(`At: ${clip(prompt.tree.url, 120)}${prompt.tree.root.name === undefined ? '' : ` "${clip(prompt.tree.root.name, 60)}"`}`);
-    const news = newsSince(prompt, this.#seen, fullReads);
+    this.observe(prompt);
+    const news = newsSince(prompt, this.#seen, fullReads, this.#tools);
     const secrets = secretLines(prompt).join('\n');
     this.#pending = { seen: news.seen, header, secrets };
+    this.#once = news.once;
     // Outside the capped state block: the line is the run's own grammar, and
     // cut it would offer a placeholder without its fields.
     const changed =
@@ -3735,6 +3783,8 @@ export class BrainThread {
       this.#secrets = this.#pending.secrets;
       this.#pending = undefined;
     }
+    const shown = this.#seen.toolResults;
+    this.#tools = this.#tools.filter((echo) => echo.step > shown);
     if (this.#need.length === 0 && need.length > 0) {
       this.#need = need;
     }
@@ -3771,12 +3821,20 @@ interface Seen {
 }
 
 /**
- * Findings, extracted data, tool results, ruled-out approaches and the plan,
- * newer than what the brain was shown — within {@link BRAIN_BUDGET}.news. By
- * the step each entry was written on, not by count: the prompt's blocks are
- * bounded and evict their oldest entries, so a count would skip or repeat.
+ * Findings, extracted data, ruled-out approaches and the plan, newer than what
+ * the brain was shown — within {@link BRAIN_BUDGET}.news — after this turn's
+ * whole reads and its tool replies ({@link toolReplies}), each in its own
+ * budget. By the step each entry was written on, not by count: the prompt's
+ * blocks are bounded and evict their oldest entries, so a count would skip or
+ * repeat. `tools` is the thread's own collection (see `BrainThread.observe`),
+ * not the prompt's last three.
  */
-function newsSince(prompt: AgentPrompt, seen: Seen, fullReads: readonly string[] = []): { readonly text: string; readonly seen: Seen } {
+function newsSince(
+  prompt: AgentPrompt,
+  seen: Seen,
+  fullReads: readonly string[] = [],
+  tools: readonly ToolCallEcho[] = prompt.toolResults ?? [],
+): { readonly text: string; readonly once: string; readonly seen: Seen } {
   const lines: string[] = [];
   const reads: string[] = [];
   const fresh = <T extends { readonly step: number }>(entries: readonly T[], after: number): readonly T[] =>
@@ -3786,7 +3844,6 @@ function newsSince(prompt: AgentPrompt, seen: Seen, fullReads: readonly string[]
   const findings = prompt.memory?.findings ?? [];
   const ruledOut = prompt.memory?.ruledOut ?? [];
   const extracted = prompt.extracted ?? [];
-  const tools = prompt.toolResults ?? [];
   const goals = (prompt.memory?.goals ?? []).map((goal) => `${goal.id}[${goal.status}] ${goal.goal}`).join('; ');
   // Facts are NOT labelled with their step: "Note (step 3)" beside the step
   // whose click opened the current page read as a note about that page, and
@@ -3799,9 +3856,6 @@ function newsSince(prompt: AgentPrompt, seen: Seen, fullReads: readonly string[]
     } else {
       reads.push(whole);
     }
-  }
-  for (const echo of fresh(tools, seen.toolResults)) {
-    lines.push(`Tool ${echo.tool}${echo.isError ? ' FAILED' : ''}: ${echo.text}`);
   }
   for (const entry of fresh(findings, seen.findings)) {
     lines.push(`Note: ${entry.text}`);
@@ -3819,9 +3873,11 @@ function newsSince(prompt: AgentPrompt, seen: Seen, fullReads: readonly string[]
       : `${all.slice(0, BRAIN_BUDGET.news - 60)}… (${String(all.length - BRAIN_BUDGET.news + 60)} more chars on the run record)`;
   const readText = reads.join('\n');
   const whole = readText.length <= BRAIN_BUDGET.reads ? readText : `${readText.slice(0, BRAIN_BUDGET.reads - 1)}…`;
-  const text = [whole, rest].filter((part) => part !== '').join('\n');
+  const replies = toolReplies(fresh(tools, seen.toolResults));
+  const text = [whole, replies.kept, rest].filter((part) => part !== '').join('\n');
   return {
     text,
+    once: replies.once,
     seen: {
       findings: newest(findings, seen.findings),
       ruledOut: newest(ruledOut, seen.ruledOut),
@@ -3829,6 +3885,65 @@ function newsSince(prompt: AgentPrompt, seen: Seen, fullReads: readonly string[]
       toolResults: newest(tools, seen.toolResults),
       goals,
     },
+  };
+}
+
+/** One turn's tool replies: `kept` rides the thread and is replayed; `once` goes with this call only. */
+export interface ToolReplyView {
+  readonly kept: string;
+  readonly once: string;
+}
+
+/**
+ * Tool replies as the brain gets them, oldest first. A page's text (any reply
+ * but a search) goes WHOLE once, in the call it arrives (`once`, outside the
+ * replayed thread), within {@link BRAIN_BUDGET}.tools for the turn, and the
+ * thread, which every later call replays, keeps its first
+ * {@link BRAIN_BUDGET}.toolKept characters. A `web.search` reply is leads,
+ * not evidence: it is shown and kept to its first `toolKept` characters, with
+ * the rest named as not shown.
+ *
+ * Measured on the dev set, 2026-10-14. Kept whole in the replayed thread
+ * (21c8df21), replies grew a long BrowseComp run's prefix and its fold
+ * rewrites: brain $/call 0.0107 -> 0.0173 over 19 runs. Whole once, search
+ * included (1942f6da): 0.0110 -> 0.0149 over 18, BrowseComp pass 13/18 both
+ * ways; 376 of 601 BrowseComp searches asked for 10 results, which come to
+ * about 4,000 characters whole against the ~1,150 the brain used to see.
+ *
+ * A reply that does not fit the turn is not cut: it is named, with its first
+ * line, as not shown, so the brain calls it again rather than page on from an
+ * offset past text it never read. Only a single reply larger than the whole
+ * budget is cut, and says where.
+ */
+export function toolReplies(echoes: readonly ToolCallEcho[], budget: number = BRAIN_BUDGET.tools): ToolReplyView {
+  const kept: string[] = [];
+  const once: string[] = [];
+  let used = 0;
+  for (const echo of echoes) {
+    const head = `Tool ${echo.tool}${echo.isError ? ' FAILED' : ''}`;
+    const whole = `${head}: ${echo.text}`;
+    if (echo.text.length <= BRAIN_BUDGET.toolKept) {
+      kept.push(whole);
+    } else if (echo.tool === 'web.search') {
+      kept.push(
+        `${head}: ${echo.text.slice(0, BRAIN_BUDGET.toolKept)}… (the other ${String(echo.text.length - BRAIN_BUDGET.toolKept)} characters of these results were not shown: ask for fewer results or a narrower query)`,
+      );
+    } else if (used + whole.length <= budget || used === 0) {
+      const cut = whole.length > budget;
+      kept.push(
+        `${head}: ${echo.text.slice(0, BRAIN_BUDGET.toolKept)}… (the other ${String(echo.text.length - BRAIN_BUDGET.toolKept)} characters were shown once, in the turn this arrived)`,
+      );
+      once.push(cut ? `${whole.slice(0, budget)}… (reply cut here: its last ${String(whole.length - budget)} characters were not shown)` : whole);
+      used += Math.min(whole.length, budget) + 1;
+    } else {
+      kept.push(
+        `Tool ${echo.tool}: reply NOT shown (over this turn's limit for tool replies): ${clip(echo.text.split('\n', 1)[0] ?? '', 160)}. Call it again on its own to read it.`,
+      );
+    }
+  }
+  return {
+    kept: kept.join('\n'),
+    once: once.length === 0 ? '' : `Tool replies, whole (shown this turn only; your thread keeps their start):\n${once.join('\n')}`,
   };
 }
 
@@ -3862,6 +3977,23 @@ export function wholeRead(entry: string, fullReads: readonly string[]): string |
   return full === undefined ? undefined : `Read (whole) on ${parsed[1] ?? ''}: ${JSON.stringify(full)}`;
 }
 
+/**
+ * What the brain is told about the `web.*` tools, once, in the run header of a
+ * run offered them. The brain sees each tool's description cut at 160
+ * characters, which ends web.read's at "Prefer this over navigating for
+ * anything you only…", and the loop's `WEB_TOOL_RULE` goes to the hands'
+ * prompt only, so the brain was never told where the tools stop. On the dev
+ * set (web-tools-on, 2026-10-14) it read a generic route page for driving
+ * distances from an area rather than a hotel (m2w2-06 r1, r2) and searched
+ * for job listings 59 times without opening a board (m2w2-01 r1), where the
+ * base run used a maps site's directions and the boards in the browser.
+ */
+const WEB_TOOLS_RULE =
+  'Web tools find sources and read a page\'s text. A web.read reply is shown to you whole in the turn it arrives; ' +
+  'later turns keep only its start, so "note" what you will need. They do not operate a ' +
+  'site: when the task needs a site to do something (run its own search or filters, compute a route or ' +
+  'driving distance, show a price, availability or listing as it is now), do that part in the browser on that site.';
+
 /** The run's constants: the first user turn's head. Cached with the thread from step two on. */
 function runHeader(prompt: AgentPrompt): string {
   const lines = [`TASK: ${prompt.task}`];
@@ -3882,6 +4014,9 @@ function runHeader(prompt: AgentPrompt): string {
   }
   for (const tool of prompt.tools ?? []) {
     lines.push(`Tool ${tool.name}: ${clip(tool.description, 160)}${tool.inputSchema === undefined ? '' : ` ${JSON.stringify(tool.inputSchema)}`}`);
+  }
+  if ((prompt.tools ?? []).some((tool) => tool.name.startsWith('web.'))) {
+    lines.push(WEB_TOOLS_RULE);
   }
   // The loop's own per-run grammar, word for word, for what this run holds:
   // nothing for a run without it. Sits with the task in the cached first

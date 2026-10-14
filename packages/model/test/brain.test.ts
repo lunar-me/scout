@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
 import type { Clock } from '@outcrawl/scout-core';
-import { hashSnapshot, nodeRef, renderPrompt, type AgentPrompt, type AxNode, type AxTree, type StepTrace } from '@outcrawl/runtime';
+import { hashSnapshot, nodeRef, renderPrompt, type AgentPrompt, type AxNode, type AxTree, type StepTrace, type ToolCallEcho } from '@outcrawl/runtime';
 
 import { BRAIN_BUDGET, BRAIN_SCHEMA, BRAIN_SYSTEM_PROMPT, BrainThread, actionKey, repeatedActions, retryableNavigations, alreadyRead, reloadAsNavigate, briefElements, briefFacts, rankedReadGap, rawBrief, readBrief, reconciledNavigate, redirectedSite, searchedBefore, selectBrief as selectBriefWithRefs, directAction, threadReply, unconfirmedSlot, wholeRead, wrongListItem, readWithConditions, comboboxMiss, factsBesideReads, listingVerdicts } from '../src/brain';
 import { HarnessModelPort, type ModelPlan } from '../src/harness';
@@ -2292,6 +2292,64 @@ describe('the brain stays inside its budgets', () => {
 
   test('the cached system turn (rules + schema) is within its budget', () => {
     expect(BRAIN_SYSTEM_PROMPT.length + JSON.stringify(BRAIN_SCHEMA).length).toBeLessThanOrEqual(BRAIN_BUDGET.system);
+  });
+
+  /**
+   * MUTATIONS THIS CATCHES: tool replies inside the 1,200-character news block
+   * (a 4,000-character web.read reached the brain as its first ~1,150), a
+   * queued run of calls read off the loop's three-deep echo window (the
+   * earlier replies never reached the brain), and whole replies replayed on
+   * every later call. Dev set, 2026-10-14.
+   */
+  test('queued tool replies reach the brain whole once, the thread keeps their start, and one over the limit is named', () => {
+    const thread = new BrainThread();
+    const reply = (step: number): ToolCallEcho => ({
+      step,
+      tool: 'web.read',
+      isError: false,
+      text: `Page ${String(step)} — https://example.com/${String(step)}\nshowing characters 0-4000 of 9000\n\n${`${String(step)}x`.repeat(1_999)}END${String(step)}`,
+    });
+    const at = (step: number, toolResults: readonly ToolCallEcho[]): AgentPrompt => ({ ...promptFor(TREE, 'list them', step), toolResults });
+    const first = thread.step(at(0, []));
+    thread.commit(0, first, '{"do":"act"}', 'line');
+    // Four queued reads, steps 1-4: by the brain's turn the loop's prompt holds the last three.
+    thread.observe(at(2, [reply(1)]));
+    thread.observe(at(3, [reply(1), reply(2)]));
+    const turn = thread.step(at(5, [reply(2), reply(3), reply(4)]));
+    const once = thread.once();
+    for (const step of [1, 2, 3]) {
+      expect(once).toContain(reply(step).text);
+      expect(turn).toContain(reply(step).text.slice(0, BRAIN_BUDGET.toolKept));
+      expect(turn).not.toContain(`END${String(step)}`);
+    }
+    expect(`${turn}${once}`).not.toContain('END4');
+    expect(turn).toContain('reply NOT shown (over this turn\'s limit for tool replies): Page 4 — https://example.com/4');
+    thread.commit(5, turn, '{"do":"act"}', 'line');
+    expect(thread.step(at(6, [reply(2), reply(3), reply(4)]))).not.toContain('Tool web.read');
+    expect(thread.once()).toBe('');
+  });
+
+  test('a long search reply shows its first results and names the rest as not shown; nothing of it goes once', () => {
+    const thread = new BrainThread();
+    const hits = Array.from({ length: 10 }, (_, i) => `${String(i + 1)}. Result ${String(i + 1)} — https://r.example/${String(i + 1)}\n   ${'snippet '.repeat(40)}HIT${String(i + 1)}`);
+    const text = `10 results for "q":\n${hits.join('\n')}`;
+    const first = thread.step(promptFor(TREE, 'find it', 0));
+    thread.commit(0, first, '{"do":"act"}', 'line');
+    const turn = thread.step({ ...promptFor(TREE, 'find it', 1), toolResults: [{ step: 0, tool: 'web.search', isError: false, text }] });
+    expect(turn).toContain(text.slice(0, BRAIN_BUDGET.toolKept));
+    expect(turn).not.toContain('HIT10');
+    expect(turn).toContain('of these results were not shown');
+    expect(thread.once()).toBe('');
+  });
+
+  test('the port sends a tool reply whole in the never-replayed tail, and never onto the step record', async () => {
+    const text = `Long page — https://example.com/long\nshowing characters 0-4000 of 9000\n\n${'word '.repeat(790)}LASTWORDS`;
+    const provider = new FakeProvider([brain({ do: 'act', a: { type: 'click', ref: '0-11' } })]);
+    const { port } = brainPort(provider, PLAN, true);
+    const choice = await port.choose({ ...promptFor(TREE, 'read it', 1), toolResults: [{ step: 0, tool: 'web.read', isError: false, text }] });
+    expect(provider.requests[0]?.tail).toContain(text);
+    expect(provider.requests[0]?.prompt).not.toContain('LASTWORDS');
+    expect(JSON.stringify(choice.brief)).not.toContain('Long page');
   });
 });
 

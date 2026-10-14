@@ -1137,9 +1137,9 @@ export class HarnessModelPort implements ModelPort {
   readonly #reconciled = new Map<number, StepTrace>();
   /** The facts block the thread last kept, so an unchanged page is not kept twice. */
   #lastFacts: string | undefined;
-  /** This step's uncached tail (the elements), sent with every brain call of the step. */
+  /** This step's uncached tail (the tool replies whole, then the elements), sent with every brain call of the step. */
   #tail = '';
-  /** Every element list the brain was shown this run: they ride outside the thread, so the trace keeps them. */
+  /** Every tail the brain was shown this run: they ride outside the thread, so the untraced-name check keeps them. In memory only. */
   readonly #tails: string[] = [];
   /** The brief the brain decided this step on, for the step record (`ModelChoice.brief`); unset on a queued step. */
   #stepBrief: StepBrief | undefined;
@@ -1342,6 +1342,10 @@ export class HarnessModelPort implements ModelPort {
    */
   async #brainStep(brain: BrainSlot, raw: AgentPrompt): Promise<ModelChoice> {
     const prompt = this.#reconcile(raw);
+    // Every step's tool replies, queued steps included: the prompt carries only
+    // the newest three, and a queued run of reads would otherwise reach the
+    // brain as its last three at most (see `BrainThread.observe`).
+    brain.thread.observe(prompt);
     // A dropdown that took another option than the one typed stops the queue
     // and is the brain's to see, never silently accepted.
     const missed = comboboxMiss(prompt);
@@ -1418,12 +1422,16 @@ export class HarnessModelPort implements ModelPort {
     const sameFacts = facts === this.#lastFacts;
     const qualifying = this.#qualifyingNote(prompt);
     const kept = `${brain.thread.step(prompt, expected, warnings, this.#fullReads)}\n${sameFacts ? 'Page and facts: unchanged since your last turn.' : facts}${qualifying === undefined ? '' : `\n${qualifying}`}`;
-    this.#tail = briefElements(prompt.tree, brief);
+    const elements = briefElements(prompt.tree, brief);
+    // The tool replies of this turn, whole, ride the tail with the elements:
+    // the thread keeps their short form (see `toolReplies`).
+    const toolsOnce = brain.thread.once();
+    this.#tail = toolsOnce === '' ? elements : `${toolsOnce}\n${elements}`;
     this.#tails.push(this.#tail);
     // The page as the brain read it, whole, for the step record: never the
     // "unchanged" line the thread got instead, so one record answers what it
-    // was shown.
-    this.#stepBrief = { facts, elements: this.#tail };
+    // was shown. Never a tool reply: a trace is durable.
+    this.#stepBrief = { facts, elements };
     const first = await this.#decide(brain, prompt.step, kept, this.#tail, spent);
     // Held only once the thread committed the turn that carried them.
     if (first !== undefined) {
