@@ -1899,22 +1899,14 @@ export class HarnessModelPort implements ModelPort {
           }
         }
         {
-          // The brain's own list of what it did not confirm reaches the loop's
-          // unconfirmed door on the action, as the actuator's `done` carries it.
-          // Its evidence goes too, each entry beside the condition it answers
-          // when there is one entry per condition: a schema-less run returns
-          // it under the answer (runtime `answerWithEvidence`).
+          // No `unconfirmed` list (ws/doubt-off): a doubt the brain keeps goes in
+          // its answer, where the loop's door reads it (`admittedGaps`).
+          // Its evidence goes on the action, each entry beside the condition
+          // it answers when there is one entry per condition: a schema-less
+          // run returns it under the answer (runtime `answerWithEvidence`).
           const need = brain.thread.need();
           const evidence = decision.evidence.map((entry, index) => (need.length === decision.evidence.length ? `${need[index]!}: ${entry}` : entry));
-          return decided(
-            {
-              type: 'done',
-              summary: decision.answer,
-              ...(decision.unconfirmed.length > 0 ? { unconfirmed: decision.unconfirmed } : {}),
-              ...(evidence.length > 0 ? { evidence } : {}),
-            },
-            finishClosures(decision, prompt),
-          );
+          return decided({ type: 'done', summary: decision.answer, ...(evidence.length > 0 ? { evidence } : {}) }, finishClosures(decision, prompt));
         }
       case 'fail':
         // A FAIL THAT NAMES WHERE THE ANSWER IS IS ASKED ONCE MORE: it ends

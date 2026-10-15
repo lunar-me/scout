@@ -1996,19 +1996,22 @@ describe('class mechanisms run in the port, not in the prompt', () => {
   });
 
   /**
-   * The brain's own list of what it did not confirm reaches the loop's
-   * unconfirmed door on the `done` action. MUTATIONS THIS CATCHES: the list
-   * dropped between the brain's reply and the action (it was, for every brain
-   * finish, until 2026-10-14); blank entries passed through as conditions.
+   * Arm ws/doubt-off: the brain is neither asked for nor given a list of
+   * what it did not confirm, and a list it sends anyway never reaches the
+   * action. The doubt it writes in its answer stays there, word for word.
+   * MUTATIONS THIS CATCHES: the `unconfirmed` field or its prompt sentence
+   * put back; the port forwarding a stray list onto the `done`; the answer
+   * trimmed of its own hedge.
    */
-  test('a brain done carries its unconfirmed list onto the action', async () => {
-    const provider = new FakeProvider([
-      brain({ do: 'done', why: 'from the read', answer: 'Shop A, opened 1987', unconfirmed: ['the street address', ' '] }),
-    ]);
+  test('a brain done carries no unconfirmed list, and its answer keeps its own doubt', async () => {
+    expect(Object.keys(BRAIN_SCHEMA.properties)).not.toContain('unconfirmed');
+    expect(BRAIN_SYSTEM_PROMPT).not.toContain('unconfirmed');
+    const answer = 'Shop A, opened 1987. Its street address is unverified.';
+    const provider = new FakeProvider([brain({ do: 'done', why: 'from the read', answer, unconfirmed: ['the street address'] })]);
     const { port } = brainPort(provider, PLAN, true);
     const base = promptFor(TREE, 'the shop that opened before 1990, and its street address');
     const choice = await port.choose({ ...base, extracted: [{ step: 1, text: 'Shop A opened 1987' }] } as typeof base);
-    expect(choice.action).toEqual({ type: 'done', summary: 'Shop A, opened 1987', unconfirmed: ['the street address'] });
+    expect(choice.action).toEqual({ type: 'done', summary: answer });
   });
 
   /**

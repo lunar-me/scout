@@ -104,13 +104,11 @@ import type { ModelTurn } from './provider';
  *   A cached prefix: ~50 more tokens at the cache-read price. 4,100 for the
  *   `hands` delegation (owner cost sprint, 2026-10-03): ~75 more cached tokens
  *   ($0.000015 a call) against a brain call saved per delegated step. 4,300
- *   for `done.unconfirmed` (ws/finish-gap, 2026-10-14): the loop's unconfirmed
- *   door reads that list, and a brain `done` had no field for it: 3 of 1,158
- *   scout-1 finishes in the 7 days to 2026-10-13 carried one, and the door
- *   held none. ~50 more cached tokens. 4,450 for `done.evidence`
- *   (ws/answer-evidence, 2026-10-15): a schema-less run's answer carries, per
- *   condition, the fact read and its source or "not confirmed". ~35 more
- *   cached tokens.
+ *   for `done.unconfirmed` (ws/finish-gap, 2026-10-14). 4,450 for
+ *   `done.evidence` (ws/answer-evidence, 2026-10-15): a schema-less run's
+ *   answer carries, per condition, the fact read and its source or "not
+ *   confirmed". ~35 more cached tokens. 4,300 again with `done.unconfirmed`
+ *   removed (ws/doubt-off, 2026-10-15).
  * - `facts`: the page state and the task's facts, kept in the thread.
  *   2,100 (and {@link LIST_FACTS} 2,700), three times the first 700/900:
  *   doubled first (BrainMeasure sim on c6e23bc0, 2026-10-05 01:18-01:28Z,
@@ -140,7 +138,7 @@ import type { ModelTurn } from './provider';
  *   billed as written, so the rule is in the prompt, not a truncation.
  */
 export const BRAIN_BUDGET = Object.freeze({
-  system: 4_450,
+  system: 4_300,
   facts: 2_100,
   elements: 900,
   step: 600,
@@ -2505,8 +2503,7 @@ export const BRAIN_SYSTEM_PROMPT = [
   '{"do":"read","read":"..."}: fields to read here, restating the task\'s filters; it returns next turn;',
   ' with "final":true (the read IS the whole answer) it ends the run.',
   '{"do":"done","why":"<=25 words: the deciding evidence; arithmetic worked","answer":"...","evidence":',
-  ' ["per need item, in order: fact as read, URL or page title" or "not confirmed"],"unconfirmed":',
-  ' ["need item with no evidence"]} (why first; omit "unconfirmed" when none), or',
+  ' ["per need item, in order: fact as read, URL or page title" or "not confirmed"]} (why first), or',
   ' {"do":"fail","answer":"why"}. No "why" on other replies; "need" on the first only.',
   '{"do":"hands","say":"goal","until":"<8 words: the page when finished"}: the hands act alone, up to 4',
   ' steps, and call you back when "until" holds or they are stuck. Use it when the next steps need no',
@@ -2520,8 +2517,8 @@ export const BRAIN_SYSTEM_PROMPT = [
   '',
   'RULES',
   '- Only what this run read, never memory. Combine facts from pages.',
-  '- Done only when every "need" item has evidence here; one the answer calls unverified goes in',
-  '  "unconfirmed". A candidate failing one goes in "no". Same name, other place or year: other entity.',
+  '- Done only when every "need" item has evidence here. A candidate failing one goes in "no". Same',
+  '  name, other place or year: other entity.',
   '- Never repeat a read on a page; partial means open the source or ask narrower. Results pages and AI',
   '  overviews are leads; sites echoing the question are not evidence. Leave spam and age walls.',
   '- Search the most distinctive clue, not the whole task.',
@@ -2557,7 +2554,6 @@ export const BRAIN_SCHEMA = {
     why: { type: 'string' },
     need: { type: 'array', items: { type: 'string' } },
     evidence: { type: 'array', items: { type: 'string' } },
-    unconfirmed: { type: 'array', items: { type: 'string' } },
     no: { type: 'string' },
     note: { type: 'string' },
     plan: {
@@ -2645,8 +2641,6 @@ export type BrainDecision = {
   | {
       readonly kind: 'done';
       readonly answer: string;
-      /** The `need` items the answer has no evidence for, in the brain's words. */
-      readonly unconfirmed: readonly string[];
       /** Per `need` item, in order: the fact read and its source, or "not confirmed". */
       readonly evidence: readonly string[];
     }
@@ -2744,13 +2738,12 @@ export function readDecision(data: unknown): BrainDecision | undefined {
     case 'done': {
       const answer = text('answer');
       // Read on the actuator's `done` terms (runtime `textList`).
-      const unconfirmed = stringList(data['unconfirmed']);
       const evidence = stringList(data['evidence']);
-      return answer === undefined ? undefined : { kind: 'done', why, notes, need, then: [], answer, unconfirmed, evidence };
+      return answer === undefined ? undefined : { kind: 'done', why, notes, need, then: [], answer, evidence };
     }
     case 'fail': {
       const answer = text('answer');
-      return answer === undefined ? undefined : { kind: 'fail', why, notes, need, then: [], answer };
+      return answer === undefined ? undefined : { kind: data['do'], why, notes, need, then: [], answer };
     }
     default: {
       // `"do"` naming an action type is that action: its fields are under

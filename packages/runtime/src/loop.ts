@@ -5665,10 +5665,11 @@ export const UNCONFIRMED_HOLD_BELOW = 0.5;
 /**
  * One gap a `done` stops on, and the channel that carried it.
  *
- * - `listed`: the model's own `done.unconfirmed` list, the first channel.
+ * - `listed`: the model's own `done.unconfirmed` list, the first channel. Only
+ *   the actuator is offered it ({@link EVIDENCE_RULE}); scout-1's brain has no
+ *   such field since ws/doubt-off (2026-10-15).
  * - `stated`: the answer's own words say a part of it is not established
- *   ({@link admittedGaps}). The model was asked to list such a part and did
- *   not, so its prose is the only place the gap is said.
+ *   ({@link admittedGaps}): the only channel a brain finish has.
  * - `unopened`: the run finishes having opened nothing, on a task that names
  *   the site or source to use ({@link namedSource}).
  */
