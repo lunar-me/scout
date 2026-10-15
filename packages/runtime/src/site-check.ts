@@ -64,6 +64,14 @@ export const SITE_CHECK_TOOL = 'page.verify';
  */
 export const MAX_SITE_CHECK_CALLS_PER_RUN = 3;
 
+/**
+ * The solvers' own advice when a check they found could not be cleared
+ * (`worker/src/*-check.ts`, `*-puzzle.ts`): "Reload the page once and call
+ * this again". Read off the reply rather than carried beside it so the loop
+ * reloads exactly when the model is told to, and stops when the advice goes.
+ */
+const RELOAD_ADVICE = /reload the page once and call this again/i;
+
 export const SITE_CHECK_TOOL_DESCRIPTION =
   'Complete a verification check the site itself is showing: a "Press & Hold" button, a "Click to verify" check with ' +
   'icons to select in order, a slider puzzle ("slide to complete the puzzle"), a grid of pictures to click until they ' +
@@ -163,7 +171,15 @@ export function siteCheckToolPort(options: SiteCheckToolOptions): SiteCheckPort 
       return { isError: true, text, note: `threw: ${text}` };
     }
     const text = `${SITE_CHECK_TOOL} (${String(used)} of ${String(limit)}): ${result.detail}`;
-    return { isError: result.outcome !== 'solved', text, note: `${result.outcome}: ${text}` };
+    // A check this tool knows is on the page and it could not clear: the
+    // tool failing, not the page ignoring the agent (see `ToolCallOutcome.standingCheck`).
+    const standing = result.outcome === 'refused' || result.outcome === 'unreadable';
+    return {
+      isError: result.outcome !== 'solved',
+      text,
+      note: `${result.outcome}: ${text}`,
+      ...(standing ? { standingCheck: { reload: used < limit && RELOAD_ADVICE.test(result.detail) } } : {}),
+    };
   }
 
   /**

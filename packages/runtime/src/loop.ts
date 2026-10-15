@@ -777,6 +777,22 @@ export interface ToolCallOutcome {
    * record showed nothing the read returned (2026-10-14).
    */
   readonly note?: string;
+  /**
+   * `page.verify` only: a check the tool knows is ON the page and it could not
+   * clear it (`refused` or `unreadable`). Such a failure is the tool failing,
+   * not the page ignoring the agent, so it is not charged to `stepFailures`
+   * (see the `catch` in `runAgent`); `page.verify`'s own call limit bounds it.
+   * `reload`: the solver advised reloading the page and calls remain, so the
+   * loop reloads it once, through the ordinary navigation, before the model
+   * calls again.
+   *
+   * BU Bench task 80, `run_…` (2026-10-14): a slider solved, then a pipe
+   * check page.verify could not read twice, each reply saying "Reload the page
+   * once and call this again"; the model clicked the widget's own Refresh
+   * instead, and error, contradiction, error, contradiction made four and
+   * stopped the run at 50 of 2000 credits and 97 s of 30 min.
+   */
+  readonly standingCheck?: { readonly reload: boolean };
 }
 
 /**
@@ -804,9 +820,12 @@ export interface ToolCallEcho {
  * got.
  */
 class ToolReplyError extends Error {
-  constructor(tool: string) {
+  /** The reply's {@link ToolCallOutcome.standingCheck} was set: not charged to `stepFailures`. */
+  readonly standingCheck: boolean;
+  constructor(tool: string, standingCheck = false) {
     super(`${tool} reported an error; its reply is in the tool results block of the next prompt`);
     this.name = 'ToolReplyError';
+    this.standingCheck = standingCheck;
   }
 }
 
@@ -12202,11 +12221,53 @@ export async function runAgent<T = unknown>(
                */
               case 'callTool': {
                 const result = await page.callTool(action.tool, action.arguments);
+                // Only the site-check port's word counts: a connector's reply
+                // is somebody else's, and may claim anything.
+                const standing = action.tool === SITE_CHECK_TOOL && result.isError ? result.standingCheck : undefined;
+                /**
+                 * THE RELOAD `page.verify` ADVISED, done for the model before
+                 * it calls again, while calls remain. Its replies end "Reload
+                 * the page once and call this again", and a model on a check
+                 * page does what the page invites instead: BU Bench task 80
+                 * (2026-10-14) clicked the widget's own Refresh twice, each
+                 * contradicted, and the run stopped. The current url, through
+                 * the ordinary navigation and its rules, with what the caps
+                 * have left; the step stays the call, and its note and the
+                 * reply say the page was reloaded.
+                 */
+                let reloaded = false;
+                if (standing?.reload === true) {
+                  const url = (await page.snapshot()).url;
+                  const reload: Action = { type: 'navigate', url };
+                  if (
+                    /^https?:/i.test(url) &&
+                    (req.rules === undefined || req.rules.length === 0 || checkNavigationRules(req.rules, reload) === undefined)
+                  ) {
+                    const loaded = await page.perform(
+                      reload,
+                      undefined,
+                      Math.max(0, Math.min(ledger.durationMs - ledger.elapsedMs(), ledger.budgetRemainingMs())),
+                    );
+                    if (loaded.credits !== undefined) {
+                      ledger.charge(loaded.credits);
+                      goalLedger?.charge(loaded.credits);
+                      pending.credits = addDecimal(pending.credits, loaded.credits);
+                    }
+                    if (loaded.usage !== undefined) {
+                      pending.usage = mergeUsage(pending.usage, loaded.usage);
+                    }
+                    reloaded = true;
+                  }
+                }
+                const reloadedLine = reloaded
+                  ? ' The page has now been reloaded once for you: do not reload it again; ' +
+                    `call ${SITE_CHECK_TOOL} on the check it shows now, or reach the information another way.`
+                  : '';
                 toolEchoes.push({
                   step: index,
                   tool: action.tool,
                   isError: result.isError,
-                  text: result.text,
+                  text: result.text + reloadedLine,
                 });
                 if (toolEchoes.length > TOOL_ECHO_WINDOW) {
                   toolEchoes.splice(0, toolEchoes.length - TOOL_ECHO_WINDOW);
@@ -12216,7 +12277,7 @@ export async function runAgent<T = unknown>(
                 // `ToolCallOutcome.note` for why the two are different fields.
                 pending.tool = {
                   isError: result.isError,
-                  ...(result.note === undefined ? {} : { note: result.note.slice(0, MAX_TOOL_NOTE_CHARS) }),
+                  ...(result.note === undefined ? {} : { note: (result.note + reloadedLine).slice(0, MAX_TOOL_NOTE_CHARS) }),
                 };
                 // A tool that reports failure is a FAILED STEP, so
                 // `stepFailures` bounds a model that calls a broken tool
@@ -12230,7 +12291,7 @@ export async function runAgent<T = unknown>(
                 // mailbox. Same rule as the success path, applied where it is
                 // easiest to forget.
                 if (result.isError) {
-                  throw new ToolReplyError(action.tool);
+                  throw new ToolReplyError(action.tool, standing !== undefined);
                 }
                 // `result.credits` when the port priced this call (a `web.*`
                 // tool's page fetch; absent for a connector call) — reaching
@@ -13246,6 +13307,18 @@ export async function runAgent<T = unknown>(
           stopReason = 'error';
           break;
         }
+        continue;
+      }
+      /**
+       * `page.verify` COULD NOT CLEAR A CHECK THAT IS ON THE PAGE: the tool
+       * failing, not the page ignoring the agent, so it is not charged to
+       * `stepFailures` — and does not zero it either, so a real no-effect run
+       * around it still stops. Bounded by the tool's own call limit; a call
+       * past it, or one that finds no check, is charged as before. See
+       * {@link ToolCallOutcome.standingCheck} for the run it ended.
+       */
+      if (error instanceof ToolReplyError && error.standingCheck) {
+        failure = undefined;
         continue;
       }
       consecutiveFailures += 1;

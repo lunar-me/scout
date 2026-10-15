@@ -7,6 +7,7 @@ import type { AgentPrompt, EvidenceOutcome, LockedPage, ModelChoice, PerformOutc
 import { LockNotHeldError, PageSession, REFUSED_STEP_TOLERANCE, observe, runAgent } from '../src/loop';
 import type { DurableRecord, StepTrace } from '../src/result';
 import { MAX_STEP_BRIEF_CHARS, MAX_TOOL_NOTE_CHARS, toWireStep } from '../src/result';
+import { SITE_CHECK_TOOL, siteCheckToolPort, type SiteCheckResult } from '../src/site-check';
 import { filterTree, formatNodeRef, hashSnapshot, nodeRef } from '../src/snapshot';
 import { VirtualClock, catalogueTree, harness, node, refOf, testPricing } from './support';
 
@@ -2248,6 +2249,79 @@ describe('a tool call leaves its verdict, and only its port\u2019s note, on the 
     const result = await runAgent({ ...h.deps, tools: long }, { task: 't', caps: CAPS, stepFailures: 3 });
 
     expect(result.steps[0]?.tool?.note).toHaveLength(MAX_TOOL_NOTE_CHARS);
+  });
+});
+
+/**
+ * BU Bench task 80, `run_…` (2026-10-14): page.verify solved a slider, then
+ * could not read a pipe check twice, each reply saying "Reload the page once
+ * and call this again". The model clicked the widget's Refresh instead, each
+ * click contradicted, and error, contradiction, error, contradiction made four
+ * and stopped the run with most of its budget left.
+ */
+describe('page.verify failing on a check that is on the page', () => {
+  const verify: Action = { type: 'callTool', tool: SITE_CHECK_TOOL, arguments: {} };
+  const ADVICE = 'the pipe check could not be read. Reload the page once and call this again, or reach the information another way.';
+  const unreadable = (): Promise<SiteCheckResult> => Promise.resolve({ outcome: 'unreadable', detail: ADVICE, touched: false });
+  const clickFails = (action: Action): void => {
+    if (action.type === 'click') throw new Error('the click changed nothing');
+  };
+
+  test('is not charged to stepFailures, and the advised reload is done while calls remain', async () => {
+    const h = harness({
+      tree: page,
+      perform: clickFails,
+      model: script(
+        { action: verify }, { action: click },
+        { action: verify }, { action: click },
+        { action: verify }, { action: click },
+        { action: done },
+      ),
+    });
+
+    const result = await runAgent(
+      { ...h.deps, tools: siteCheckToolPort({ solve: unreadable }) },
+      { task: 'search the store', caps: { ...CAPS, steps: 10 }, stepFailures: 3 },
+    );
+
+    expect(result.status).toBe('completed');
+    // Reloaded after the first and second calls, where calls remained; not after the third.
+    expect(h.performed.filter((action) => action.type === 'navigate')).toEqual([
+      { type: 'navigate', url: page.url },
+      { type: 'navigate', url: page.url },
+    ]);
+    expect(h.prompts[1]?.toolResults?.find((echo) => echo.step === 0)?.text).toContain('reloaded once for you');
+    expect(h.prompts[5]?.toolResults?.find((echo) => echo.step === 4)?.text).toBe(`page.verify (3 of 3): ${ADVICE}`);
+    expect(result.steps[0]?.tool?.note).toContain('reloaded once for you');
+  });
+
+  test('neither charges nor clears the count, so a page ignoring every click still stops the run', async () => {
+    const h = harness({
+      tree: page,
+      perform: clickFails,
+      model: script({ action: click }, { action: click }, { action: click }, { action: verify }, { action: click }, { action: done }),
+    });
+
+    const result = await runAgent(
+      { ...h.deps, tools: siteCheckToolPort({ solve: unreadable }) },
+      { task: 'search the store', caps: CAPS, stepFailures: 3 },
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.stopReason).toBe('error');
+    expect(result.steps).toHaveLength(5);
+  });
+
+  test('a call that finds no check, or one past the limit, is charged as before', async () => {
+    const port = siteCheckToolPort({
+      maxCalls: 1,
+      solve: () => Promise.resolve({ outcome: 'absent', detail: 'no check this tool knows is on the page.' }),
+    });
+    const absent = await port.call(SITE_CHECK_TOOL, {});
+    const limit = await port.call(SITE_CHECK_TOOL, {});
+
+    expect(absent.isError && absent.standingCheck === undefined).toBe(true);
+    expect(limit.isError && limit.standingCheck === undefined).toBe(true);
   });
 });
 
