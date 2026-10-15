@@ -107,7 +107,10 @@ import type { ModelTurn } from './provider';
  *   for `done.unconfirmed` (ws/finish-gap, 2026-10-14): the loop's unconfirmed
  *   door reads that list, and a brain `done` had no field for it: 3 of 1,158
  *   scout-1 finishes in the 7 days to 2026-10-13 carried one, and the door
- *   held none. ~50 more cached tokens.
+ *   held none. ~50 more cached tokens. 4,450 for `done.evidence`
+ *   (ws/answer-evidence, 2026-10-15): a schema-less run's answer carries, per
+ *   condition, the fact read and its source or "not confirmed". ~35 more
+ *   cached tokens.
  * - `facts`: the page state and the task's facts, kept in the thread.
  *   2,100 (and {@link LIST_FACTS} 2,700), three times the first 700/900:
  *   doubled first (BrainMeasure sim on c6e23bc0, 2026-10-05 01:18-01:28Z,
@@ -137,7 +140,7 @@ import type { ModelTurn } from './provider';
  *   billed as written, so the rule is in the prompt, not a truncation.
  */
 export const BRAIN_BUDGET = Object.freeze({
-  system: 4_300,
+  system: 4_450,
   facts: 2_100,
   elements: 900,
   step: 600,
@@ -2501,7 +2504,8 @@ export const BRAIN_SYSTEM_PROMPT = [
   '{"do":"say","say":"..."}: the next action in under 12 words, for an element not listed.',
   '{"do":"read","read":"..."}: fields to read here, restating the task\'s filters; it returns next turn;',
   ' with "final":true (the read IS the whole answer) it ends the run.',
-  '{"do":"done","why":"<=25 words: the deciding evidence; arithmetic worked","answer":"...","unconfirmed":',
+  '{"do":"done","why":"<=25 words: the deciding evidence; arithmetic worked","answer":"...","evidence":',
+  ' ["per need item, in order: fact as read, URL or page title" or "not confirmed"],"unconfirmed":',
   ' ["need item with no evidence"]} (why first; omit "unconfirmed" when none), or',
   ' {"do":"fail","answer":"why"}. No "why" on other replies; "need" on the first only.',
   '{"do":"hands","say":"goal","until":"<8 words: the page when finished"}: the hands act alone, up to 4',
@@ -2552,6 +2556,7 @@ export const BRAIN_SCHEMA = {
     answer: { type: 'string' },
     why: { type: 'string' },
     need: { type: 'array', items: { type: 'string' } },
+    evidence: { type: 'array', items: { type: 'string' } },
     unconfirmed: { type: 'array', items: { type: 'string' } },
     no: { type: 'string' },
     note: { type: 'string' },
@@ -2637,7 +2642,14 @@ export type BrainDecision = {
   | { readonly kind: 'act'; readonly action: Readonly<Record<string, unknown>> }
   | { readonly kind: 'instruct'; readonly instruction: string }
   | { readonly kind: 'extract'; readonly extract: string; readonly final: boolean }
-  | { readonly kind: 'done'; readonly answer: string; /** The `need` items the answer has no evidence for, in the brain's words. */ readonly unconfirmed: readonly string[] }
+  | {
+      readonly kind: 'done';
+      readonly answer: string;
+      /** The `need` items the answer has no evidence for, in the brain's words. */
+      readonly unconfirmed: readonly string[];
+      /** Per `need` item, in order: the fact read and its source, or "not confirmed". */
+      readonly evidence: readonly string[];
+    }
   | { readonly kind: 'fail'; readonly answer: string }
 );
 
@@ -2654,6 +2666,12 @@ export function readDecision(data: unknown): BrainDecision | undefined {
     const value = data[key];
     return typeof value === 'string' && value.trim() !== '' ? value : undefined;
   };
+  // A list field read leniently: a lone string is a one-entry list, and
+  // anything else is no list.
+  const stringList = (value: unknown): string[] =>
+    (typeof value === 'string' ? [value] : Array.isArray(value) ? value : [])
+      .filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
+      .map((entry) => entry.trim());
   const why = text('why') ?? '';
   const thenRaw = data['then'];
   const then: QueuedStep[] = (Array.isArray(thenRaw) ? thenRaw : [])
@@ -2725,13 +2743,10 @@ export function readDecision(data: unknown): BrainDecision | undefined {
     }
     case 'done': {
       const answer = text('answer');
-      const listed = data['unconfirmed'];
-      // Read on the actuator's `done.unconfirmed` terms (runtime `unconfirmedList`):
-      // a lone string is a one-entry list, and anything else is no list.
-      const unconfirmed = (typeof listed === 'string' ? [listed] : Array.isArray(listed) ? listed : [])
-        .filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
-        .map((entry) => entry.trim());
-      return answer === undefined ? undefined : { kind: 'done', why, notes, need, then: [], answer, unconfirmed };
+      // Read on the actuator's `done` terms (runtime `textList`).
+      const unconfirmed = stringList(data['unconfirmed']);
+      const evidence = stringList(data['evidence']);
+      return answer === undefined ? undefined : { kind: 'done', why, notes, need, then: [], answer, unconfirmed, evidence };
     }
     case 'fail': {
       const answer = text('answer');
@@ -3676,6 +3691,12 @@ export class BrainThread {
   #secrets = '';
   /** The task's condition checklist, from the brain's first reply. */
   #need: readonly string[] = [];
+
+  /** The task's condition checklist, from the brain's first reply; empty before it. */
+  need(): readonly string[] {
+    return this.#need;
+  }
+
   /** The step the brain last decided on; -1 before its first decision. */
   #lastStep = -1;
   /**

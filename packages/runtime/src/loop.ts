@@ -70,6 +70,7 @@ import {
 
 import type {
   Action,
+  DoneAction,
   QuestionAskAction,
   SecretAskAction,
   Envelope,
@@ -5419,6 +5420,20 @@ function summaryAsData(summary: string, slot: string | undefined, collected: unk
     return { ...base, ...(structured as Record<string, unknown>) };
   }
   return typeof structured === 'string' && slot !== undefined ? { ...base, [slot]: summary } : undefined;
+}
+
+/**
+ * A `done` summary as a schema-less run's data: the answer, then one line per
+ * condition the task sets with what this run read for it and where, or that
+ * it was not confirmed (`DoneAction.evidence`, in the model's own words). The
+ * finish doors read the summary alone, and the `unconfirmed` list stays on
+ * the action as it was. A schema run's data is its schema object and never
+ * takes these lines.
+ */
+function answerWithEvidence(action: DoneAction): string {
+  const summary = action.summary ?? '';
+  const evidence = action.evidence ?? [];
+  return summary === '' || evidence.length === 0 ? summary : `${summary}\nEvidence:\n${evidence.map((line) => `- ${line}`).join('\n')}`;
 }
 
 /** The words and numbers of an answer's values — never its keys — lowercased, in any script. */
@@ -11906,7 +11921,7 @@ export async function runAgent<T = unknown>(
                   // answer check's rule below, for the same reason.
                   const summary = action.summary ?? '';
                   const answer =
-                    summaryAnswer ?? (req.schema === undefined && !answerExtracted && summary !== '' ? summary : undefined);
+                    summaryAnswer ?? (req.schema === undefined && !answerExtracted && summary !== '' ? answerWithEvidence(action) : undefined);
                   if (answer !== undefined) {
                     collected = answer;
                   }
@@ -11947,7 +11962,7 @@ export async function runAgent<T = unknown>(
                    * or nothing. A later `done` supersedes it by the same rule.
                    */
                   if (refusedFinish !== undefined && (answer === summary || answer === summaryAnswer)) {
-                    collected = answer;
+                    collected = req.schema === undefined && answer === summary ? answerWithEvidence(action) : answer;
                   }
                 }
               }
@@ -13823,7 +13838,8 @@ export async function runAgent<T = unknown>(
        * precedent of the `fail` branch above: the two are set from `isTerminal`
        * and are not the same fact.
        */
-      const summary = pending.action.type === 'done' ? pending.action.summary : undefined;
+      const done = pending.action.type === 'done' ? pending.action : undefined;
+      const summary = done?.summary;
       const slot = answerSlot(req.schema);
       /**
        * The second half of the conflict door: the model was shown both answers
@@ -13846,12 +13862,12 @@ export async function runAgent<T = unknown>(
           slot !== undefined &&
           summary !== undefined &&
           !summaryAgrees(summary, collected));
-      if (adoptsSummary && summary !== undefined && summary !== '') {
+      if (adoptsSummary && done !== undefined && summary !== undefined && summary !== '') {
         collected =
           summaryAnswer !== undefined
             ? summaryAnswer
             : slot === null
-              ? summary
+              ? answerWithEvidence(done)
               : (summaryAsData(summary, slot, collected) ?? (slot === undefined ? summary : collected));
         // `-1`, and not `pending.index`: the summary is promoted after the
         // loop has stopped and belongs to the run rather than to the step

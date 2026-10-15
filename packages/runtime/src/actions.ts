@@ -574,6 +574,13 @@ export interface DoneAction {
    * budget is unspent, once; see `unconfirmedNotice` in `./loop`.
    */
   readonly unconfirmed?: readonly string[];
+  /**
+   * What this run read for each condition the task states, one line each:
+   * the fact and where it was read, or that it was not confirmed. A
+   * schema-less run returns them under the summary (`answerWithEvidence` in
+   * `./loop`); a schema run's data is its schema object and carries none.
+   */
+  readonly evidence?: readonly string[];
 }
 
 export interface FailAction {
@@ -809,13 +816,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * `done.unconfirmed`, read leniently: the non-empty strings of a list, or a
- * lone string as a one-entry list, and nothing for any other shape. Lenient
- * because refusing a finish over an advisory field would spend a correction
- * call on the step the model is trying to end, and because what it says is
- * already in the summary in words.
+ * `done.unconfirmed` and `done.evidence`, read leniently: the non-empty
+ * strings of a list, or a lone string as a one-entry list, and nothing for
+ * any other shape. Lenient because refusing a finish over an advisory field
+ * would spend a correction call on the step the model is trying to end, and
+ * because what it says is already in the summary in words.
  */
-function unconfirmedList(value: unknown): readonly string[] {
+function textList(value: unknown): readonly string[] {
   const entries = typeof value === 'string' ? [value] : Array.isArray(value) ? value : [];
   return entries.filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '').map((entry) => entry.trim());
 }
@@ -1441,13 +1448,15 @@ export function validateAction(action: unknown, tree: AxTree): ValidationResult<
       if (summary !== undefined && typeof summary !== 'string') {
         return { ok: false, errors: ['summary must be a string when present'] };
       }
-      const unconfirmed = unconfirmedList(action['unconfirmed']);
+      const unconfirmed = textList(action['unconfirmed']);
+      const evidence = textList(action['evidence']);
       return {
         ok: true,
         value: {
           type: 'done',
           ...(summary !== undefined ? { summary } : {}),
           ...(unconfirmed.length > 0 ? { unconfirmed } : {}),
+          ...(evidence.length > 0 ? { evidence } : {}),
         },
       };
     }
