@@ -166,6 +166,31 @@ describe('a brain step', () => {
     expect(provider.requests[3]?.tail).toContain('[0-11] button "Checkout"');
   });
 
+  /**
+   * MUTATION THIS CATCHES: a "not confirmed" evidence entry reaching the done
+   * action, where the answer and the step record would show it.
+   */
+  test('a done keeps only the evidence that cites what was read', async () => {
+    const provider = new FakeProvider([
+      eyes(),
+      brain({
+        do: 'done',
+        answer: 'Checked out for $12.00',
+        evidence: ['Order total $12.00, https://shop.example/checkout', 'not confirmed', 'Delivery Friday, Not confirmed on the page'],
+      }),
+    ]);
+    const { port } = brainPort(provider);
+    const choice = await port.choose(promptFor(TREE));
+    expect(choice.action).toEqual({ type: 'done', summary: 'Checked out for $12.00', evidence: ['Order total $12.00, https://shop.example/checkout'] });
+  });
+
+  test('a done whose every evidence entry is not confirmed carries no evidence', async () => {
+    const provider = new FakeProvider([eyes(), brain({ do: 'done', answer: 'Checked out for $12.00', evidence: ['not confirmed', 'not confirmed'] })]);
+    const { port } = brainPort(provider);
+    const choice = await port.choose(promptFor(TREE));
+    expect(choice.action).toEqual({ type: 'done', summary: 'Checked out for $12.00' });
+  });
+
   test('a hands extract is never final and always carries an instruction', async () => {
     const provider = new FakeProvider([
       eyes(),

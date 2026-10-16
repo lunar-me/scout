@@ -1904,8 +1904,16 @@ export class HarnessModelPort implements ModelPort {
           // Its evidence goes on the action, each entry beside the condition
           // it answers when there is one entry per condition: a schema-less
           // run returns it under the answer (runtime `answerWithEvidence`).
+          // Only entries that cite what was read are kept; a "not confirmed"
+          // entry is dropped, so the answer lists sources, never a list of
+          // what was not read. Judge-only replay on BU Bench V1 (2026-10-16,
+          // build 958babb1, the 65 runs of 300 whose evidence held such an
+          // entry, 2 rejudges each): 29 passes as recorded, 38 with those
+          // entries dropped from the answer and the done step, 11 runs up and
+          // 0 down; dropping them from the answer alone gave 32.
           const need = brain.thread.need();
-          const evidence = decision.evidence.map((entry, index) => (need.length === decision.evidence.length ? `${need[index]!}: ${entry}` : entry));
+          const labelled = decision.evidence.map((entry, index) => (need.length === decision.evidence.length ? `${need[index]!}: ${entry}` : entry));
+          const evidence = labelled.filter((entry) => !NOT_CONFIRMED.test(entry));
           return decided({ type: 'done', summary: decision.answer, ...(evidence.length > 0 ? { evidence } : {}) }, finishClosures(decision, prompt));
         }
       case 'fail':
@@ -2591,6 +2599,9 @@ const BRAIN_MAX_TOKENS = 3_000;
 
 /** A task that asks the run to collect or record things as it goes. */
 const COLLECT_TASK = /\b(record|collect|note down|write down|keep track|list (each|every|all)|for each|each of the|every one)\b/i;
+
+/** An evidence entry that says its condition was not read, the brain's own wording in its done template. */
+const NOT_CONFIRMED = /not confirmed/i;
 
 /** The brain's extract input for one kept step. One builder, so the thread replays exactly what was sent. */
 function brainInput(kept: string): ExtractInput {
