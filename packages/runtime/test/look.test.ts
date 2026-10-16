@@ -7,7 +7,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 
-import type { LookAnswer, LookCamera, LookQuestion, LookShot, LookVision } from '../src/look';
+import type { LookAim, LookAnswer, LookCamera, LookQuestion, LookShot, LookVision } from '../src/look';
 import { DEFAULT_LOOKS_PER_RUN, LOOK_TOOL, MAX_FAILED_LOOKS, lookAllowance, looksTaken, lookToolPort } from '../src/look';
 import type { ModelChoice } from '../src/loop';
 import { runAgent } from '../src/loop';
@@ -19,12 +19,14 @@ const SHOT: LookShot = {
   viewport: { width: 1200, height: 800 },
 };
 
-function camera(overrides: Partial<LookCamera> = {}): LookCamera & { shots: number } {
+function camera(overrides: Partial<LookCamera> = {}): LookCamera & { shots: number; aims: { aim?: LookAim; awaitPaint?: boolean }[] } {
   const state = {
     shots: 0,
-    async shoot(): Promise<LookShot> {
+    aims: [] as { aim?: LookAim; awaitPaint?: boolean }[],
+    async shoot(aim?: LookAim, awaitPaint?: boolean): Promise<LookShot> {
       state.shots += 1;
-      return SHOT;
+      state.aims.push({ ...(aim === undefined ? {} : { aim }), ...(awaitPaint === undefined ? {} : { awaitPaint }) });
+      return aim?.region === undefined ? SHOT : { ...SHOT, region: aim.region };
     },
     async locate(): Promise<undefined> {
       return undefined;
@@ -106,12 +108,88 @@ describe('page.look reads pixels for a text-only actuator', () => {
     expect(out.text).toContain('not visible on screen');
   });
 
-  test('a named element is passed to the vision model as its box on the same grid', async () => {
-    const eyes = vision(() => ({ answer: 'blue', found: true, usage: {} }));
-    const shot = { ...SHOT, focus: { x: 120, y: 80, width: 240, height: 160 } };
-    const port = lookToolPort({ camera: camera({ shoot: async () => shot }), vision: eyes });
-    await port.call(LOOK_TOOL, { question: 'What colour is it?', ref: '7-4242' });
-    expect(eyes.asked[0]?.focus).toEqual({ x0: 100, y0: 100, x1: 300, y1: 300 });
+  test('a named element is photographed alone, and a point on it is a point in the viewport', async () => {
+    const eyes = vision(() => ({ answer: 'the blue swatch', found: true, point: { x: 500, y: 250 }, usage: {} }));
+    const located: { x: number; y: number }[] = [];
+    const lens = camera({
+      async shoot(aim) {
+        return aim?.ref === undefined ? SHOT : { ...SHOT, region: { x: 120, y: 80, width: 240, height: 160 } };
+      },
+      async locate(point) {
+        located.push(point);
+        return undefined;
+      },
+    });
+    const port = lookToolPort({ camera: lens, vision: eyes });
+    await port.call(LOOK_TOOL, { question: 'Where is the blue swatch?', ref: '7-4242' });
+    expect(eyes.asked[0]?.enlarged).toBe(true);
+    // 500/1000 of 240 px from x 120, 250/1000 of 160 px from y 80.
+    expect(located).toEqual([{ x: 240, y: 120 }]);
+  });
+});
+
+describe('a look may take ONE retake: closer, or once the page has drawn', () => {
+  test('a zoom box is photographed enlarged, widened, and the second answer is the answer', async () => {
+    const lens = camera();
+    let call = 0;
+    const eyes = vision(() => {
+      call += 1;
+      return call === 1
+        ? { answer: 'too small', found: true, zoom: { x0: 500, y0: 500, x1: 600, y1: 550 }, usage: { inputTokens: 1300, outputTokens: 20 } }
+        : { answer: '1874, 1903, 1929', found: true, usage: { inputTokens: 1200, outputTokens: 30 } };
+    });
+    const port = lookToolPort({ camera: lens, vision: eyes });
+
+    const out = await port.call(LOOK_TOOL, { question: 'Which years are printed in the scan?' });
+
+    expect(eyes.asked.map((q) => q.retake === true)).toEqual([true, false]);
+    // 500-600 x 500-550 of a 1200x800 viewport is x 600-720, y 400-440; widened by 15%, at least 12 px.
+    expect(lens.aims[1]?.aim?.region).toEqual({ x: 582, y: 388, width: 156, height: 64 });
+    expect(eyes.asked[1]?.enlarged).toBe(true);
+    expect(out.text).toContain('1874, 1903, 1929');
+    expect(out.text).toContain(`(2 of ${String(DEFAULT_LOOKS_PER_RUN)})`);
+    expect(out.usage).toEqual({ inputTokens: 2500, outputTokens: 50 });
+  });
+
+  test('content not drawn yet is photographed again once the camera has waited for its paint', async () => {
+    const lens = camera();
+    let call = 0;
+    const eyes = vision(() => {
+      call += 1;
+      return call === 1
+        ? { answer: 'the chart is empty', found: false, unpainted: true, usage: {} }
+        : { answer: '38.6', found: true, usage: {} };
+    });
+    const port = lookToolPort({ camera: lens, vision: eyes });
+    const out = await port.call(LOOK_TOOL, { question: 'What value is above the April bar?', ref: '7-4242' });
+    expect(lens.aims.map((shot) => shot.awaitPaint === true)).toEqual([false, true]);
+    expect(lens.aims[1]?.aim?.ref).toEqual(lens.aims[0]?.aim?.ref);
+    expect(out.text).toContain('38.6');
+  });
+
+  test('the last call of the allowance is never spent on a retake', async () => {
+    const lens = camera();
+    const eyes = vision(() => ({ answer: 'blurry', found: true, zoom: { x0: 0, y0: 0, x1: 100, y1: 100 }, usage: {} }));
+    const port = lookToolPort({ camera: lens, vision: eyes, maxLooks: 1 });
+    const out = await port.call(LOOK_TOOL, { question: 'q' });
+    expect(eyes.asked.map((q) => q.retake === true)).toEqual([false]);
+    expect(lens.shots).toBe(1);
+    expect(out.text).toContain('(1 of 1)');
+  });
+
+  test('a retake that fails leaves the first answer standing', async () => {
+    let shots = 0;
+    const lens = camera({
+      async shoot() {
+        shots += 1;
+        if (shots > 1) throw new Error('the page produced no frame');
+        return SHOT;
+      },
+    });
+    const port = lookToolPort({ camera: lens, vision: vision(() => ({ answer: 'roughly 40', found: true, unpainted: true, usage: {} })) });
+    const out = await port.call(LOOK_TOOL, { question: 'q' });
+    expect(out.isError).toBe(false);
+    expect(out.text).toContain('roughly 40');
   });
 });
 
@@ -256,6 +334,26 @@ describe('the look allowance is per run, across every browser the run holds', ()
     // The next browser's port, seeded from those steps, continues the count.
     const next = lookToolPort({ camera: camera(), vision: vision(() => ({ answer: 'x', found: true, usage: {} })), taken: looksTaken(result.steps) });
     expect((await next.call(LOOK_TOOL, { question: 'q' })).text).toContain(`(3 of ${String(DEFAULT_LOOKS_PER_RUN)})`);
+  });
+
+  test('a look that took a retake is two calls on resume as well', async () => {
+    let call = 0;
+    const port = lookToolPort({
+      camera: camera(),
+      vision: vision(() => {
+        call += 1;
+        return call === 1 ? { answer: 'small', found: true, zoom: { x0: 0, y0: 0, x1: 500, y1: 500 }, usage: {} } : { answer: 'x', found: true, usage: {} };
+      }),
+    });
+    const page = tree(node({ role: 'RootWebArea', name: 'p', children: [node({ role: 'button', name: 'Go' })] }));
+    const h = harness({
+      tree: page,
+      model: (_prompt, step): ModelChoice =>
+        step < 2 ? { action: { type: 'callTool', tool: LOOK_TOOL, arguments: { question: 'q' } } } : { action: { type: 'done' } },
+    });
+    const result = await runAgent({ ...h.deps, tools: port }, { task: 't', caps: { steps: 4, budget: '10', duration: '10m' }, stepFailures: null });
+    // The first look zoomed (2 calls), the second did not (1 call).
+    expect(looksTaken(result.steps)).toBe(3);
   });
 });
 

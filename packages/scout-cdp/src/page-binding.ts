@@ -60,7 +60,7 @@ import { pdfDocuments, pdfMarkdown, pdfNotice } from './pdf-document';
 import { textDocumentMarkdown, textDocumentNotice, textDocumentWindow, textDocuments, type TextDocumentRead } from './text-document';
 import { topFrameWatch } from './top-frame';
 import { HIT_SAMPLES, HIT_WINDOW_PX, LANDING_DRAWS, LIST_OPTION_POLL_MS, LIST_OPTION_ROLES, LIST_OPTION_WAIT_MS, LIST_SELECT_SETTLE_MS, MAX_REACH_GESTURE_PX, MAX_REACH_TOTAL_PX, MAX_SCROLLS_TO_REACH, MIN_HITTABLE_PX, PAINTED_DESCENDANT_DEPTH, PAINTED_DESCENDANT_READS, PAINTED_RUN_STEPS, POINT_AIM_PX, REST_EPSILON_PX, SCROLL_PROGRESS_PX, SCROLL_REST_POLL_MS, SCROLL_REST_TIMEOUT_MS, TYPED_LIST_ROLES, normalisedName, textOutsideLists } from './reach';
-import { CLIPPING_SCROLLER, DISMISS_NAME, EDITABLE_FIELD_WIDTH, EDITABLE_FIELDS, EDITABLE_HOST, FILE_INPUT_NEAR, FIXED_OF, FOCUS_TAKES_TEXT, LABELLED_CONTROL_TYPES, MAX_DISMISS_CHECKS, MAX_DISMISS_NAMED, MAX_MIXED_LABEL_READS, MAX_NATIVE_DATE_READS, MODAL_OF, NATIVE_DATE_HOST, NATIVE_DATE_LAYOUT, SAME_CONTROL, SELECT_OF, asShown, clipFrom, nativeSelect, refusedSubmit } from './scripts';
+import { CLIPPING_SCROLLER, DISMISS_NAME, EDITABLE_FIELD_WIDTH, EDITABLE_FIELDS, EDITABLE_HOST, FILE_INPUT_NEAR, FIXED_OF, FOCUS_TAKES_TEXT, LABELLED_CONTROL_TYPES, MAX_DISMISS_CHECKS, MAX_DISMISS_NAMED, MAX_MIXED_LABEL_READS, MAX_NATIVE_DATE_READS, MODAL_OF, NATIVE_DATE_HOST, NATIVE_DATE_LAYOUT, SAME_CONTROL, SELECT_OF, VISIBLE_PART, asShown, clipFrom, nativeSelect, refusedSubmit, visibleFrom } from './scripts';
 
 /**
  * The `Outcrawl.getAXTree` node ceiling this binding asks for, well above the
@@ -3801,6 +3801,14 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
     return typeof found === 'number' ? found : backendNodeId;
   }
 
+  /** What a scrolled pane leaves showing of `ref`: `VISIBLE_PART`, read in the look world of `ref`'s own frame. */
+  async function visiblePart(ref: NodeRef): Promise<HandsTarget | undefined> {
+    const { page: session } = await sessionFor(ref);
+    const frameId = await frameIdOf(session, ref);
+    if (frameId === undefined) return undefined;
+    return visibleFrom(await inLookWorld(session, frameId, { on: ref.backendNodeId, declaration: VISIBLE_PART, returns: 'value' }));
+  }
+
   // The camera: the set-of-marks capture and `page.look`'s reads (`./camera`).
   const { capture, lookShoot, shootElement, lookLocate } = pageCamera({
     page,
@@ -3810,6 +3818,7 @@ export function pageBinding(page: CdpPage, options: BindingOptions): AgentDeps {
     sessionFor,
     boxOf,
     sessionFrame,
+    visiblePart,
   });
 
   const bound: AgentDeps = {

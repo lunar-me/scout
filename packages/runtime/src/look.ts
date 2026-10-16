@@ -57,6 +57,7 @@ import type { JsonSchema, Usage } from '@outcrawl/scout-core';
 
 import type { ExposedTool, ToolCallOutcome, ToolPort } from './loop';
 import type { StepTrace } from './result';
+import { mergeUsage } from './result';
 import type { NodeRef } from './snapshot';
 import { formatNodeRef, parseNodeRef } from './snapshot';
 
@@ -71,9 +72,11 @@ export const LOOK_TOOL = 'page.look';
 export const DEFAULT_LOOKS_PER_RUN = 8;
 
 /**
- * The most one look costs, in credits: what {@link lookAllowance} divides
- * the budget's share by. MEASURED in production, 7 days to 2026-10-14, n=692
- * answered looks: the vision call's own cost was $0.00075 at the median and
+ * The most one vision call costs, in credits: what {@link lookAllowance}
+ * divides the budget's share by. The allowance counts calls, so a look that
+ * takes a retake (see {@link lookToolPort}) is charged two. MEASURED in
+ * production, 7 days to 2026-10-14, n=692 answered looks (one call each
+ * then): the vision call's own cost was $0.00075 at the median and
  * $0.0039 at p99 (11,596 input and 785 output tokens), which at the dearest
  * credit (the Builder plan: 10,000 credits for $49, model spend marked up
  * 1.70) is 0.26 and 1.34 credits; its inference took 2.1 s at the median and
@@ -99,7 +102,7 @@ export const LOOK_CREDITS_BOUND = 1.5;
 export const LOOK_BUDGET_SHARE = 0.2;
 
 /**
- * How many looks a run with `budget` credits may make: as many p99 looks as
+ * How many vision calls a run with `budget` credits may make: as many p99 calls as
  * {@link LOOK_BUDGET_SHARE} of it buys, and at least one. `budget` is
  * `caps.budget`, a decimal credit string; one that does not parse gets
  * {@link DEFAULT_LOOKS_PER_RUN}.
@@ -134,16 +137,27 @@ export interface ViewportRect {
   readonly height: number;
 }
 
-/** One photograph of the focused tab's viewport. */
+/**
+ * What a look photographs: the whole viewport (neither field), one element
+ * (`ref`), or a part of the viewport (`region`, CSS px).
+ */
+export interface LookAim {
+  readonly ref?: NodeRef;
+  readonly region?: ViewportRect;
+}
+
+/** One photograph of the focused tab: its viewport, or a part of it enlarged. */
 export interface LookShot {
   readonly image: { readonly mediaType: 'image/png'; readonly base64: string };
-  /** The viewport the picture covers, in CSS pixels. The picture may be larger (device pixels). */
+  /** The viewport, in CSS pixels. */
   readonly viewport: { readonly width: number; readonly height: number };
   /**
-   * Where the element the question named sits in the viewport, when it named
-   * one. The picture is always the whole viewport — see {@link LookCamera}.
+   * The part of the viewport the picture shows, CSS px, when it is not the
+   * whole viewport: a named element or a zoomed region, photographed at more
+   * pixels per CSS pixel than the viewport shot. A point the model names on
+   * the picture's 0-1000 grid is a point inside this rectangle.
    */
-  readonly focus?: ViewportRect;
+  readonly region?: ViewportRect;
 }
 
 /** What the tree says is painted at a point. */
@@ -162,21 +176,41 @@ export interface LookLocation {
  */
 export interface LookCamera {
   /**
-   * The whole viewport, as it is painted now. With `ref`, also where that
-   * node sits — and a refusal (throw) when it is not on screen, because this
-   * never scrolls: a scroll is an input, and input is the actuator's to send.
+   * What `aim` names, as it is painted now: the viewport, or an element or
+   * region enlarged. An element is refused (throw) when it is not on screen,
+   * because this never scrolls: a scroll is an input, and input is the
+   * actuator's to send.
+   *
+   * `awaitPaint`: the last picture showed the thing asked about not yet drawn
+   * (see {@link LookAnswer.unpainted}), so wait, within the camera's own
+   * bound, for that part of the page to change and hold still before
+   * photographing it.
    */
-  shoot(ref?: NodeRef): Promise<LookShot>;
+  shoot(aim?: LookAim, awaitPaint?: boolean): Promise<LookShot>;
   /** The node of the page's tree painted at `point`, or `undefined` when no node there has a reference. */
   locate(point: ViewportPoint): Promise<LookLocation | undefined>;
+}
+
+/** A box on the model's 0-1000 grid of a picture. */
+export interface GridBox {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
 }
 
 /** One question about one picture, as the vision model receives it. */
 export interface LookQuestion {
   readonly question: string;
   readonly image: LookShot['image'];
-  /** The named element's box on the model's 0-1000 grid, when the question named one. */
-  readonly focus?: { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number };
+  /** The picture is one element or region of the page, enlarged, not the whole screen. */
+  readonly enlarged?: boolean;
+  /**
+   * The model may ask for ONE retake instead of answering: a closer picture
+   * of a box ({@link LookAnswer.zoom}) or a later one ({@link LookAnswer.unpainted}).
+   * Absent, it answers from this picture.
+   */
+  readonly retake?: boolean;
 }
 
 /** The vision model's reply, already parsed. */
@@ -186,6 +220,10 @@ export interface LookAnswer {
   readonly found: boolean;
   /** Where the thing asked about is, on a 0-1000 grid of the picture, when the question asked where. */
   readonly point?: ViewportPoint;
+  /** Offered a retake: the thing asked about is in this box, too small to read here. */
+  readonly zoom?: GridBox;
+  /** Offered a retake: the thing asked about is not drawn yet (an empty chart, a spinner, a placeholder). */
+  readonly unpainted?: boolean;
   readonly usage: Usage;
 }
 
@@ -210,7 +248,8 @@ const LOOK_INPUT_SCHEMA: JsonSchema = {
     ref: {
       type: 'string',
       description:
-        'Optional: a [frame-backendNode] reference from the tree, written as "F-N", to direct the look at that element.',
+        'Optional: a [frame-backendNode] reference from the tree, written as "F-N". The look then photographs that ' +
+        'element alone, enlarged, so small print in an image or the labels of a chart can be read.',
     },
   },
   required: ['question'],
@@ -225,7 +264,8 @@ export const LOOK_TOOL_DESCRIPTION =
   'Look at the page the way a person would: take a screenshot of the visible viewport and get a short ' +
   'answer to one question about it. Use it for what the tree cannot show — text painted in a canvas or an ' +
   'image, a chart or map, which item is coloured, highlighted or selected, ratings drawn as icons, or to ' +
-  'check a visual result such as a shape you drew. Ask WHERE something is to get its position and, when an ' +
+  'check a visual result such as a shape you drew. To read an image or chart, pass its reference as "ref": ' +
+  'the picture is then that element enlarged. Ask WHERE something is to get its position and, when an ' +
   'element is painted there, its [F-N] reference to act on. It sees only what is on screen: scroll first ' +
   "for anything below. It takes a few seconds, and the run's budget sets how many it gets: each answer says how " +
   'many are used.';
@@ -261,36 +301,54 @@ export function parseLookArgs(args: Readonly<Record<string, unknown>> | undefine
   return { ok: true, value: { question: question.trim(), ref } };
 }
 
-/** A viewport rectangle on the model's 0-1000 grid, clamped to the picture. */
-export function toGrid(
-  rect: ViewportRect,
-  viewport: LookShot['viewport'],
-): { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number } {
-  const clamp = (value: number): number => Math.min(1000, Math.max(0, Math.round(value)));
+/**
+ * A point on the picture's 0-1000 grid, in viewport CSS pixels.
+ *
+ * The grid is a fraction OF THE PICTURE, and the picture is the viewport or
+ * {@link LookShot.region}, so no device scale factor appears anywhere — the
+ * same argument `cdp-widget.ts` makes for its clip. A point outside the grid
+ * is not a point in the picture and is refused rather than clamped: clamping
+ * would aim at an edge the model never named.
+ */
+export function fromGrid(point: ViewportPoint, shot: Pick<LookShot, 'viewport' | 'region'>): ViewportPoint | undefined {
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return undefined;
+  if (point.x < 0 || point.x > 1000 || point.y < 0 || point.y > 1000) return undefined;
+  const area = shot.region ?? { x: 0, y: 0, ...shot.viewport };
   return {
-    x0: clamp((rect.x / viewport.width) * 1000),
-    y0: clamp((rect.y / viewport.height) * 1000),
-    x1: clamp(((rect.x + rect.width) / viewport.width) * 1000),
-    y1: clamp(((rect.y + rect.height) / viewport.height) * 1000),
+    x: Math.round(area.x + (point.x / 1000) * area.width),
+    y: Math.round(area.y + (point.y / 1000) * area.height),
   };
 }
 
 /**
- * A point on the 0-1000 grid, in viewport CSS pixels.
- *
- * The grid is a fraction OF THE PICTURE, and the picture is the viewport, so
- * no device scale factor appears anywhere — the same argument `cdp-widget.ts`
- * makes for its clip. A point outside the grid is not a point in the picture
- * and is refused rather than clamped: clamping would aim at an edge the model
- * never named.
+ * How much a zoom box is widened on every side, as a share of its own size,
+ * and the least it is widened, CSS px: a model's box is drawn tight to what
+ * it saw at low resolution, and a retake that cuts the edge of a label off
+ * reads half of it.
  */
-export function fromGrid(point: ViewportPoint, viewport: LookShot['viewport']): ViewportPoint | undefined {
-  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return undefined;
-  if (point.x < 0 || point.x > 1000 || point.y < 0 || point.y > 1000) return undefined;
-  return {
-    x: Math.round((point.x / 1000) * viewport.width),
-    y: Math.round((point.y / 1000) * viewport.height),
-  };
+export const LOOK_ZOOM_MARGIN = 0.15;
+export const LOOK_ZOOM_MARGIN_MIN_PX = 12;
+
+/**
+ * The viewport rectangle a zoom box on `shot`'s picture names, widened by
+ * {@link LOOK_ZOOM_MARGIN}, rounded outward to whole CSS px and held inside
+ * what the picture showed; `undefined` for a box that is empty or off the grid.
+ */
+export function zoomRegion(box: GridBox, shot: Pick<LookShot, 'viewport' | 'region'>): ViewportRect | undefined {
+  const onGrid = [box.x0, box.y0, box.x1, box.y1].every((n) => Number.isFinite(n) && n >= 0 && n <= 1000);
+  if (!onGrid || box.x1 <= box.x0 || box.y1 <= box.y0) return undefined;
+  const area = shot.region ?? { x: 0, y: 0, ...shot.viewport };
+  const x0 = Math.round(area.x + (box.x0 / 1000) * area.width);
+  const y0 = Math.round(area.y + (box.y0 / 1000) * area.height);
+  const x1 = Math.round(area.x + (box.x1 / 1000) * area.width);
+  const y1 = Math.round(area.y + (box.y1 / 1000) * area.height);
+  const padX = Math.max(LOOK_ZOOM_MARGIN_MIN_PX, (x1 - x0) * LOOK_ZOOM_MARGIN);
+  const padY = Math.max(LOOK_ZOOM_MARGIN_MIN_PX, (y1 - y0) * LOOK_ZOOM_MARGIN);
+  const left = Math.max(area.x, Math.floor(x0 - padX));
+  const top = Math.max(area.y, Math.floor(y0 - padY));
+  const right = Math.min(area.x + area.width, Math.ceil(x1 + padX));
+  const bottom = Math.min(area.y + area.height, Math.ceil(y1 + padY));
+  return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
 function errorText(error: unknown): string {
@@ -312,25 +370,55 @@ export interface LookToolOptions {
   readonly taken?: number;
 }
 
+/** The running count a look's note opens with; see {@link looksTaken}. */
+const LOOK_TALLY = /^page\.look \((\d+) of \d+\)/u;
+
 /**
- * How many looks a run's recorded steps show it took: every `page.look` step
- * that did not fail. That is exactly what {@link lookToolPort} counts — a look
- * the vision model ANSWERED — so the durable step history is the whole record
+ * How many vision calls a run's recorded steps show it made: every answered
+ * `page.look` step counts one, or what its own tally says when that is more —
+ * a look that took a retake made two calls, and its note opens with the
+ * port's running count (`page.look (N of M)`). That is exactly what
+ * {@link lookToolPort} counts, so the durable step history is the whole record
  * of the allowance and a resume on any machine reads it back unchanged.
  */
 export function looksTaken(steps: readonly StepTrace[]): number {
-  return steps.filter(
-    (step) => step.action.type === 'callTool' && step.action.tool === LOOK_TOOL && step.error === undefined,
-  ).length;
+  let taken = 0;
+  for (const step of steps) {
+    if (step.action.type !== 'callTool' || step.action.tool !== LOOK_TOOL || step.error !== undefined) continue;
+    const tally = LOOK_TALLY.exec(step.tool?.note ?? '');
+    taken = Math.max(taken + 1, tally === null ? 0 : Number(tally[1]));
+  }
+  return taken;
 }
 
 /**
  * The `page.look` port for ONE run on one browser. The count lives in this
  * closure, seeded with {@link LookToolOptions.taken}.
  *
- * A look is COUNTED when the vision model answers it, not when it is asked:
- * that is the one event the step history records unambiguously (the step
- * succeeded), so the in-process count and the durable one cannot drift.
+ * The count is of VISION CALLS the model answered, not of asks: that is the
+ * one event the step history records unambiguously (the step succeeded, and
+ * its note carries the running count), so the in-process count and the
+ * durable one cannot drift. A look is one call, or two when it took a retake.
+ *
+ * ── The retake ──────────────────────────────────────────────────────────────
+ *
+ * One picture was not always enough, MEASURED on neutral fixtures
+ * (2026-10-16, stock headless shell at DSF 2, the look model, n=5 per cell):
+ *
+ *   * a chart drawn from data fetched after load was photographed EMPTY on
+ *     every look taken after the loop's settle (canvas and SVG, 0.5 s and 2 s
+ *     fetches: 0 of 40), because the settle waits for the tree, which a
+ *     canvas and a late SVG do not change;
+ *   * a table printed in an image shown as a 300 px thumbnail of a 1,600 px
+ *     scan was misread on every look (0 of 20: 1891, 1909, ... for 1874,
+ *     1903, ...), with or without the image's reference, because the picture
+ *     was always the whole viewport.
+ *
+ * So the first ask may answer with a RETAKE instead: a box to photograph
+ * enlarged ({@link LookAnswer.zoom}), or that the thing is not drawn yet
+ * ({@link LookAnswer.unpainted}), and the camera then waits for that part of
+ * the page to paint. One retake per look, offered only while the allowance
+ * has a call left for it, so a look is at most two calls.
  *
  * A FAILED ask is bounded separately, because the loop's `stepFailures`
  * counts CONSECUTIVE failures and a model alternating a failed look with any
@@ -346,6 +434,19 @@ export function lookToolPort(options: LookToolOptions): ToolPort {
   let used = options.taken ?? 0;
   let failedAsks = 0;
   let lastFailure = '';
+
+  /** One vision call, counted on answer; a failure is counted against {@link MAX_FAILED_LOOKS} and rethrown. */
+  async function ask(question: LookQuestion): Promise<LookAnswer> {
+    try {
+      const answer = await options.vision.ask(question);
+      used += 1;
+      return answer;
+    } catch (error) {
+      failedAsks += 1;
+      lastFailure = errorText(error);
+      throw error;
+    }
+  }
 
   async function look(args: Readonly<Record<string, unknown>> | undefined): Promise<ToolCallOutcome> {
     const parsed = parseLookArgs(args);
@@ -369,10 +470,11 @@ export function lookToolPort(options: LookToolOptions): ToolPort {
       };
     }
     const { question, ref } = parsed.value;
+    const aim: LookAim = ref === undefined ? {} : { ref };
 
     let shot: LookShot;
     try {
-      shot = await options.camera.shoot(ref);
+      shot = await options.camera.shoot(aim);
     } catch (error) {
       // Not counted: nothing was asked of the model, so nothing was spent.
       return { isError: true, text: `${LOOK_TOOL} could not photograph the page: ${errorText(error)}` };
@@ -380,17 +482,25 @@ export function lookToolPort(options: LookToolOptions): ToolPort {
 
     let answer: LookAnswer;
     try {
-      answer = await options.vision.ask({
-        question,
-        image: shot.image,
-        ...(shot.focus === undefined ? {} : { focus: toGrid(shot.focus, shot.viewport) }),
-      });
-    } catch (error) {
-      failedAsks += 1;
-      lastFailure = errorText(error);
+      answer = await ask({ question, image: shot.image, enlarged: shot.region !== undefined, retake: used + 1 < limit });
+    } catch {
       return { isError: true, text: `${LOOK_TOOL} failed to read the screenshot: ${lastFailure}` };
     }
-    used += 1;
+    let usage = answer.usage;
+    const zoomed = answer.zoom === undefined ? undefined : zoomRegion(answer.zoom, shot);
+    if ((zoomed !== undefined || answer.unpainted === true) && used < limit) {
+      // The retake. A failure here leaves the first answer standing: it is an
+      // answer, and the step it ends is not a failed look.
+      try {
+        const again = await options.camera.shoot(zoomed === undefined ? aim : { region: zoomed }, answer.unpainted === true);
+        const second = await ask({ question, image: again.image, enlarged: again.region !== undefined });
+        usage = mergeUsage(usage, second.usage);
+        answer = second;
+        shot = again;
+      } catch {
+        // Counted by `ask` when the model failed; a camera that failed spent nothing.
+      }
+    }
 
     const tally = `${LOOK_TOOL} (${String(used)} of ${String(limit)})`;
     // The answer is kept on the step (`ToolCallOutcome.note`): it is the
@@ -399,10 +509,10 @@ export function lookToolPort(options: LookToolOptions): ToolPort {
     // back (8 of 20 research misses, 2026-10-13).
     if (!answer.found) {
       const text = `${tally}: not visible on screen. ${answer.answer}`;
-      return { isError: false, text, note: text, usage: answer.usage };
+      return { isError: false, text, note: text, usage };
     }
     const lines = [`${tally}: ${answer.answer}`];
-    const point = answer.point === undefined ? undefined : fromGrid(answer.point, shot.viewport);
+    const point = answer.point === undefined ? undefined : fromGrid(answer.point, shot);
     if (point !== undefined) {
       let location: LookLocation | undefined;
       let failure: string | undefined;
@@ -436,7 +546,7 @@ export function lookToolPort(options: LookToolOptions): ToolPort {
       }
     }
     const text = lines.join('\n');
-    return { isError: false, text, note: text, usage: answer.usage };
+    return { isError: false, text, note: text, usage };
   }
 
   return {

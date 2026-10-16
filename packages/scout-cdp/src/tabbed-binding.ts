@@ -421,7 +421,7 @@ export function tabbedBinding(tabs: AgentTabs, options: BindingOptions): AgentDe
     return camera;
   };
   cameras.set(routed, {
-    shoot: async (ref) => (await focusedCamera()).shoot(ref),
+    shoot: async (aim, awaitPaint) => (await focusedCamera()).shoot(aim, awaitPaint),
     locate: async (point) => (await focusedCamera()).locate(point),
     // Only where the host can find one: a tab with no captcha hook answers none.
     ...(options.hooks?.tab === undefined

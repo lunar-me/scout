@@ -442,6 +442,57 @@ export const CLIPPING_SCROLLER = `function () {
   return null;
 }`;
 
+/**
+ * `this` is the element a look is aimed at: the part of its box that its
+ * clipping ancestors leave showing, in viewport pixels, as `{x, y, width,
+ * height}` (zero size when they hide it all). An ancestor clips when its
+ * overflow is not `visible` on that axis — except one an absolutely
+ * positioned box escapes on the way to its containing block — and the walk
+ * stops at the document's own scroller and at a fixed box. Runs in the look
+ * world; reads only.
+ *
+ * WHY: a box the viewport shows can still be scrolled out of sight inside a
+ * pane. MEASURED 2026-10-16 on a neutral fixture (stock headless shell, n=5):
+ * an image scrolled out of its 340 px pane, looked at by reference, was
+ * photographed where its box lay — the text beneath the pane — and the look
+ * model read years off it on 5 of 5 looks.
+ */
+export const VISIBLE_PART = `function () {
+  var rect = this.getBoundingClientRect();
+  var left = rect.left, top = rect.top, right = rect.right, bottom = rect.bottom;
+  var position = this.nodeType === 1 ? getComputedStyle(this).position : 'static';
+  var escaping = position === 'absolute';
+  for (var node = this, hops = 0; position !== 'fixed' && hops < 64; hops += 1) {
+    var up = node.parentNode;
+    if (up !== null && up.nodeType === 11) up = up.host === undefined ? null : up.host;
+    if (up === null || up.nodeType !== 1) break;
+    if (up === document.scrollingElement || up === document.documentElement || up === document.body) break;
+    node = up;
+    var style = getComputedStyle(node);
+    position = style.position;
+    if (escaping && position !== 'static') escaping = false;
+    if (!escaping) {
+      var box = node.getBoundingClientRect();
+      var innerLeft = box.left + node.clientLeft;
+      var innerTop = box.top + node.clientTop;
+      if (style.overflowX !== 'visible') { left = Math.max(left, innerLeft); right = Math.min(right, innerLeft + node.clientWidth); }
+      if (style.overflowY !== 'visible') { top = Math.max(top, innerTop); bottom = Math.min(bottom, innerTop + node.clientHeight); }
+    }
+    if (position === 'absolute') escaping = true;
+  }
+  return { x: left, y: top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
+}`;
+
+/** {@link VISIBLE_PART}'s answer, checked. */
+export function visibleFrom(value: unknown): HandsTarget | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const [x, y, width, height] = ['x', 'y', 'width', 'height'].map((key) => {
+    const field: unknown = (value as Record<string, unknown>)[key];
+    return typeof field === 'number' && Number.isFinite(field) ? field : undefined;
+  });
+  return x === undefined || y === undefined || width === undefined || height === undefined ? undefined : { x, y, width, height };
+}
+
 /** How many editable regions one read of a document lists. */
 export const MAX_EDITABLE_FIELDS = 24;
 

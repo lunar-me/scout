@@ -76,4 +76,19 @@ describe('the reply', () => {
     expect(parseLookReply('{"answer":"","found":true,"x":1400,"y":312}').point).toBeUndefined();
     expect(parseLookReply('{"answer":"no","found":false,"x":500,"y":500}').point).toBeUndefined();
   });
+
+  test('a retake is a zoom box that is a box on the grid, or "unpainted"; anything else is no retake', () => {
+    expect(parseLookReply('{"answer":"","found":true,"x":-1,"y":-1,"zoom":[100,200,300,260],"unpainted":false}').zoom).toEqual({
+      x0: 100,
+      y0: 200,
+      x1: 300,
+      y1: 260,
+    });
+    expect(parseLookReply('{"answer":"","found":true,"x":-1,"y":-1,"zoom":[300,200,100,260],"unpainted":false}').zoom).toBeUndefined();
+    expect(parseLookReply('{"answer":"","found":true,"x":-1,"y":-1,"zoom":[100,200,1300,260],"unpainted":false}').zoom).toBeUndefined();
+    expect(parseLookReply('{"answer":"","found":true,"x":-1,"y":-1,"zoom":[],"unpainted":false}').zoom).toBeUndefined();
+    expect(parseLookReply('{"answer":"empty chart","found":false,"x":-1,"y":-1,"zoom":[],"unpainted":true}').unpainted).toBe(true);
+    // A provider without strict output may leave the retake out altogether.
+    expect(parseLookReply('{"answer":"x","found":true,"x":-1,"y":-1}')).toEqual({ answer: 'x', found: true });
+  });
 });

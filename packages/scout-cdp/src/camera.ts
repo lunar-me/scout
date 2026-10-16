@@ -9,14 +9,24 @@
  * event. The one script is `parentElement`, walked in an ISOLATED world, so a
  * page that patched `Node.prototype` never sees it called.
  */
-import type { AxNode, AxTree, LookLocation, LookShot, Mark, MarkBox, NodeRef, PageView, ViewportPoint } from '@outcrawl/runtime';
+import type { AxNode, AxTree, LookAim, LookLocation, LookShot, Mark, MarkBox, NodeRef, PageView, ViewportPoint } from '@outcrawl/runtime';
 import { ACTIONABLE_ROLES, filterTree, formatNodeRef, walk } from '@outcrawl/runtime';
 
 import type { CdpPage } from './cdp';
 import type { HandsTarget } from './hands';
 import type { ShotRegion } from './hooks';
+import { clientViewportOf } from './input';
 import {
   LOOK_CAPTURE_DEADLINE_MS,
+  LOOK_FLAT_GRID,
+  LOOK_FLAT_SHARE,
+  LOOK_PAINT_POLL_MS,
+  LOOK_PAINT_READS,
+  LOOK_UNPAINTED_POLL_MS,
+  LOOK_UNPAINTED_READS,
+  LOOK_UNPAINTED_WAIT_MS,
+  LOOK_ZOOM_LONG_PX,
+  LOOK_ZOOM_MAX_SCALE,
   TEXT_CAPTCHA_CLIP_WIDTH_PX,
   TEXT_CAPTCHA_PAINTED_MIN_B64,
   TEXT_CAPTCHA_PAINT_POLL_MS,
@@ -24,9 +34,59 @@ import {
 } from './look';
 import { MEASURE_MARKS, drawResult, type DrawResult } from './marks';
 import { ancestorsOf, documentClip, hitAt, onScreenPart, viewport } from './page-reads';
-import { paintMarks } from './png-marks';
+import { decodePng, paintMarks, type RgbaImage } from './png-marks';
 import { MIN_HITTABLE_PX } from './reach';
 import type { Clock } from '@outcrawl/scout-core';
+
+/**
+ * Device pixels per CSS pixel out of a `Page.getLayoutMetrics` reply: the
+ * (device-pixel) `layoutViewport` over the CSS one. 1 when the reply lacks it.
+ */
+function deviceScaleOf(metrics: Record<string, unknown>, css: { readonly width: number }): number {
+  const device = metrics['layoutViewport'];
+  const width = typeof device === 'object' && device !== null && 'clientWidth' in device ? device.clientWidth : undefined;
+  const scale = typeof width === 'number' && css.width > 0 ? width / css.width : Number.NaN;
+  return Number.isFinite(scale) && scale >= 1 ? scale : 1;
+}
+
+/** Where two viewport rectangles overlap; zero-sized when they do not. */
+function overlap(a: HandsTarget, b: HandsTarget): HandsTarget {
+  const left = Math.max(a.x, b.x);
+  const top = Math.max(a.y, b.y);
+  return {
+    x: left,
+    y: top,
+    width: Math.max(0, Math.min(a.x + a.width, b.x + b.width) - left),
+    height: Math.max(0, Math.min(a.y + a.height, b.y + b.height) - top),
+  };
+}
+
+/**
+ * Whether a PNG is one flat colour on at least {@link LOOK_FLAT_SHARE} of a
+ * {@link LOOK_FLAT_GRID}-square sample grid: an element that has drawn
+ * nothing yet. A picture that does not decode is not called flat.
+ */
+function flatPicture(base64: string): boolean {
+  let image: RgbaImage;
+  try {
+    image = decodePng(Buffer.from(base64, 'base64'));
+  } catch {
+    return false;
+  }
+  const tally = new Map<number, number>();
+  let most = 0;
+  for (let row = 0; row < LOOK_FLAT_GRID; row += 1) {
+    const y = Math.floor(((row + 0.5) / LOOK_FLAT_GRID) * image.height);
+    for (let column = 0; column < LOOK_FLAT_GRID; column += 1) {
+      const at = (y * image.width + Math.floor(((column + 0.5) / LOOK_FLAT_GRID) * image.width)) * 4;
+      const colour = ((image.rgba[at] ?? 0) << 16) | ((image.rgba[at + 1] ?? 0) << 8) | (image.rgba[at + 2] ?? 0);
+      const count = (tally.get(colour) ?? 0) + 1;
+      tally.set(colour, count);
+      most = Math.max(most, count);
+    }
+  }
+  return most >= LOOK_FLAT_SHARE * LOOK_FLAT_GRID * LOOK_FLAT_GRID;
+}
 
 /** What the camera reads a bound page through. */
 export interface CameraContext {
@@ -37,18 +97,23 @@ export interface CameraContext {
   sessionFor(ref: NodeRef): Promise<{ readonly page: CdpPage; readonly backendNodeId: number }>;
   boxOf(ref: NodeRef): Promise<HandsTarget>;
   sessionFrame(): Promise<number>;
+  /**
+   * The part of `ref`'s box its clipping ancestors (a scrolled pane) leave
+   * showing, viewport CSS px, or `undefined` when that cannot be read.
+   */
+  visiblePart(ref: NodeRef): Promise<HandsTarget | undefined>;
 }
 
 /** One bound page's camera. */
 export interface PageCamera {
   capture(): Promise<PageView>;
-  lookShoot(ref?: NodeRef): Promise<LookShot>;
+  lookShoot(aim?: LookAim, awaitPaint?: boolean): Promise<LookShot>;
   shootElement(ref: NodeRef): Promise<LookShot['image']>;
   lookLocate(point: ViewportPoint): Promise<LookLocation | undefined>;
 }
 
 export function pageCamera(context: CameraContext): PageCamera {
-  const { page, clock, snapshot, maskedShot, sessionFor, boxOf, sessionFrame } = context;
+  const { page, clock, snapshot, maskedShot, sessionFor, boxOf, sessionFrame, visiblePart } = context;
 
   /**
    * The set-of-marks read: measure every candidate's rect, photograph the
@@ -211,27 +276,16 @@ export function pageCamera(context: CameraContext): PageCamera {
     return drawResult(result.value);
   }
 
-  async function lookShoot(ref?: NodeRef): Promise<LookShot> {
-    const view = await viewport(page);
-    let focus: HandsTarget | undefined;
-    if (ref !== undefined) {
-      const { page: session } = await sessionFor(ref);
-      if (session !== page) {
-        throw new Error(
-          `[${formatNodeRef(ref)}] is inside an out-of-process frame, whose box is not in this ` +
-            'viewport\'s coordinates. Ask without "ref" and name the element in the question.',
-        );
-      }
-      const shown = onScreenPart(await boxOf(ref), view);
-      if (shown.width < MIN_HITTABLE_PX || shown.height < MIN_HITTABLE_PX) {
-        throw new Error(
-          `[${formatNodeRef(ref)}] is not on screen, and a look never scrolls — scrolling is an input. ` +
-            'Scroll it into view first, then look again.',
-        );
-      }
-      focus = shown;
-    }
-    const pending = page.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  /**
+   * The last look picture as captured (before any mask) and the capture it
+   * came from: a retake for content not yet drawn waits for the same area to
+   * differ from what the model was shown.
+   */
+  let lastLook: { readonly params: string; readonly base64: string } | undefined;
+
+  /** One `Page.captureScreenshot` for a look, bounded by {@link LOOK_CAPTURE_DEADLINE_MS}. */
+  async function lookCapture(params: Record<string, unknown>): Promise<string> {
+    const pending = page.send('Page.captureScreenshot', params);
     // A reply that arrives after the deadline must not become an unhandled
     // rejection; the race below has already decided the look.
     pending.catch(() => undefined);
@@ -248,10 +302,110 @@ export function pageCamera(context: CameraContext): PageCamera {
     if (typeof base64 !== 'string' || base64 === '') {
       throw new TypeError('Page.captureScreenshot returned no data');
     }
+    return base64;
+  }
+
+  /** Re-taken until two captures in a row are identical, at most {@link LOOK_PAINT_READS}: see that constant. */
+  async function steadyCapture(params: Record<string, unknown>): Promise<string> {
+    let previous = await lookCapture(params);
+    for (let read = 1; read < LOOK_PAINT_READS; read += 1) {
+      await clock.sleep(LOOK_PAINT_POLL_MS);
+      const current = await lookCapture(params);
+      if (current === previous) return current;
+      previous = current;
+    }
+    return previous;
+  }
+
+  /**
+   * For content the model said was not drawn: re-taken until it differs from
+   * the picture the model was shown and two captures in a row agree, bounded
+   * in time and in reads (a clock is not obliged to move). With no earlier
+   * picture of this same area, it can only wait for stillness.
+   */
+  async function paintedCapture(params: Record<string, unknown>): Promise<string> {
+    const key = JSON.stringify(params);
+    const before = lastLook?.params === key ? lastLook.base64 : undefined;
+    if (before === undefined) return steadyCapture(params);
+    const deadline = clock.now() + LOOK_UNPAINTED_WAIT_MS;
+    let previous: string | undefined;
+    let current = before;
+    for (let read = 0; read < LOOK_UNPAINTED_READS; read += 1) {
+      current = await lookCapture(params);
+      if (current !== before && current === previous) return current;
+      if (clock.now() >= deadline) return current;
+      previous = current;
+      await clock.sleep(LOOK_UNPAINTED_POLL_MS);
+    }
+    return current;
+  }
+
+  /**
+   * `page.look`'s photograph. The viewport as painted when `aim` names
+   * nothing; an element (`ref`) or a part of the viewport (`region`) clipped
+   * from the compositor's frame and enlarged to {@link LOOK_ZOOM_LONG_PX}, so
+   * the look model spends the whole picture on it, after its paint has held
+   * still. A clip is the same read as the viewport shot: no overlay, no
+   * scroll, no resize, no script — measured 2026-10-16 on the stock headless
+   * shell (DSF 2): 15 clipped captures at scale 1, 2 and 4 raised none of
+   * resize, visualViewport resize/scroll, scroll, a resolution media change,
+   * ResizeObserver, IntersectionObserver or a rAF-sampled size/DPR change,
+   * where one metrics override raised all of them.
+   */
+  async function lookShoot(aim: LookAim = {}, awaitPaint = false): Promise<LookShot> {
+    const metrics = await page.send('Page.getLayoutMetrics');
+    const view = clientViewportOf(metrics);
+    let region: HandsTarget | undefined;
+    if (aim.ref !== undefined) {
+      const { page: session } = await sessionFor(aim.ref);
+      if (session !== page) {
+        throw new Error(
+          `[${formatNodeRef(aim.ref)}] is inside an out-of-process frame, whose box is not in this ` +
+            'viewport\'s coordinates. Ask without "ref" and name the element in the question.',
+        );
+      }
+      // The viewport's part of the box, less what a scrolled pane hides of it.
+      const shown = onScreenPart(await boxOf(aim.ref), view);
+      const visible = await visiblePart(aim.ref).catch(() => undefined);
+      region = visible === undefined ? shown : overlap(shown, visible);
+      if (region.width < MIN_HITTABLE_PX || region.height < MIN_HITTABLE_PX) {
+        throw new Error(
+          `[${formatNodeRef(aim.ref)}] is not on screen (off the viewport, or scrolled out of sight inside its ` +
+            'pane), and a look never scrolls — scrolling is an input. Scroll it into view first, then look again.',
+        );
+      }
+    } else if (aim.region !== undefined) {
+      region = onScreenPart(aim.region, view);
+      if (region.width < MIN_HITTABLE_PX || region.height < MIN_HITTABLE_PX) {
+        throw new Error('the region to enlarge is not on screen');
+      }
+    }
+    let params: Record<string, unknown> = { format: 'png', captureBeyondViewport: false };
+    if (region !== undefined) {
+      const scale = Math.min(
+        LOOK_ZOOM_MAX_SCALE,
+        Math.max(1, LOOK_ZOOM_LONG_PX / (Math.max(region.width, region.height) * deviceScaleOf(metrics, view))),
+      );
+      params = { ...params, clip: { ...(await documentClip(page, region)), scale } };
+    }
+    let base64 = awaitPaint
+      ? await paintedCapture(params)
+      : region === undefined
+        ? await lookCapture(params)
+        : await steadyCapture(params);
+    lastLook = { params: JSON.stringify(params), base64 };
+    if (!awaitPaint && aim.ref !== undefined && flatPicture(base64)) {
+      // A named element that is one flat colour has not drawn yet: see LOOK_FLAT_SHARE.
+      base64 = await paintedCapture(params);
+      lastLook = { params: JSON.stringify(params), base64 };
+    }
     return {
-      image: { mediaType: 'image/png', base64: await maskedShot(base64) },
+      image: {
+        mediaType: 'image/png',
+        base64: await maskedShot(base64, region === undefined ? undefined : { origin: { x: region.x, y: region.y }, cssWidth: region.width }),
+      },
       viewport: view,
-      ...(focus === undefined ? {} : { focus }),
+      ...(region === undefined ? {} : { region }),
     };
   }
 
@@ -281,22 +435,11 @@ export function pageCamera(context: CameraContext): PageCamera {
         throw new Error('the code image is not on screen');
       }
       const scale = Math.min(4, Math.max(1, TEXT_CAPTCHA_CLIP_WIDTH_PX / shown.width));
-      const pending = page.send('Page.captureScreenshot', {
+      const base64 = await lookCapture({
         format: 'png',
         clip: { ...(await documentClip(page, shown)), scale },
         captureBeyondViewport: false,
       });
-      pending.catch(() => undefined);
-      const shot = await Promise.race([
-        pending,
-        clock.sleep(LOOK_CAPTURE_DEADLINE_MS).then((): never => {
-          throw new Error(`the page produced no frame within ${String(LOOK_CAPTURE_DEADLINE_MS)} ms`);
-        }),
-      ]);
-      const base64 = shot['data'];
-      if (typeof base64 !== 'string' || base64 === '') {
-        throw new TypeError('Page.captureScreenshot returned no data');
-      }
       if (base64 === previous && base64.length >= TEXT_CAPTCHA_PAINTED_MIN_B64) {
         return { mediaType: 'image/png', base64: await maskedShot(base64, { origin: { x: shown.x, y: shown.y }, cssWidth: shown.width }) };
       }
